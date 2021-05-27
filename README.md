@@ -11,7 +11,22 @@ https://golang.org/doc/install
 
 ### git add remote
 ```
-git remote add origin 
+git remote add origin git@github.com:a6976933/SE5-Backend-Websocket.git
+```
+### git pull
+```
+git pull origin master
+```
+### download package
+```
+go mod download
+```
+### build
+```
+go build main.go
+```
+### run
+```
+./main
 ```
 
-### git pull
