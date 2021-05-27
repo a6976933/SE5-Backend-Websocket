@@ -56,6 +56,7 @@ func WsPing(rm *wsHandler.RoomManager) gin.HandlerFunc {
     wsH.UserID = initInfo.UserID
     wsH.Room = servingRoom
     wsH.Register()
+    wsH.FetchMessage()
     go wsH.ReadPump()
     go wsH.WritePump()
   }

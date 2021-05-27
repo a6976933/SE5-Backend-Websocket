@@ -5,6 +5,10 @@ import (
   "log"
 )
 
+const (
+  HISTORY_MSG_NUM = 50
+)
+
 type Msg interface {
   GetTime() time.Time
   GetUsername() string
@@ -48,11 +52,62 @@ func (tm TextMsg) GetTextMsg() string {
   return tm.word
 }
 
+type MsgQueue struct {
+  queue []Msg
+}
+
+func NewMsgQueue() *MsgQueue {
+  instance := new(MsgQueue)
+  instance.queue = make([]Msg, 0)
+  return instance
+}
+
+func (mq *MsgQueue) InitMsgQueue(msg []Msg) {
+  // Wait ORM Fetching
+}
+
+func (mq *MsgQueue) IsEmpty() bool {
+  if len(mq.queue) == 0 {
+    return true
+  } else {
+    return false
+  }
+}
+
+func (mq *MsgQueue) Push(msg Msg) bool {
+  if len(mq.queue) < HISTORY_MSG_NUM {
+    mq.queue = append(mq.queue, msg)
+    return true
+  } else {
+    return false
+  }
+}
+
+func (mq *MsgQueue) PopHead() Msg {
+  msg := mq.queue[0]
+  mq.queue = mq.queue[1:]
+  return msg
+}
+
+func (mq *MsgQueue) FetchAll() []Msg {
+  ret := make([]Msg, 0)
+  for _, v := range mq.queue {
+    ret = append(ret, v)
+  }
+  return ret
+}
+
+func (mq *MsgQueue) RefreshHead() {
+  mq.queue = mq.queue[1:]
+}
+
+
 type RoomMsgManager struct {
   ID int // room ID
   Name string //room name
   Manager *RoomManager
   OnlineMemberList map[int]*WsHandler
+  historyMsgQueue *MsgQueue
   broadcast chan Msg
   register chan WsRegister
   unregister chan int
@@ -66,6 +121,7 @@ func NewRoomMsgManager() *RoomMsgManager {
   instance.register = make(chan WsRegister)
   instance.unregister = make(chan int)
   instance.message = make(chan Msg)
+  instance.historyMsgQueue = NewMsgQueue()
   return instance
 }
 
@@ -75,6 +131,11 @@ func (rmm *RoomMsgManager) Run() {
     case message := <-rmm.broadcast:
       log.Println("Got Broadcast ", message.GetTextMsg())
       log.Println("Now Online List", len(rmm.OnlineMemberList))
+      if !rmm.historyMsgQueue.Push(message) {
+        rmm.historyMsgQueue.RefreshHead()
+        rmm.historyMsgQueue.Push(message)
+      }
+
       for key, member := range rmm.OnlineMemberList {
         log.Println("UserID: ",key)
         log.Println("Member :", member.Username)
@@ -95,7 +156,6 @@ func (rmm *RoomMsgManager) Run() {
         close(rmm.OnlineMemberList[memberID].broadTextMsg)
         delete(rmm.OnlineMemberList, memberID)
       }
-
     }
   }
 }

@@ -74,6 +74,26 @@ func (wsh *WsHandler) initUpgrader(rbSize int, wbSize int) {
   }
 }
 
+func (wsh *WsHandler) FetchMessage() bool {
+  if !wsh.Room.historyMsgQueue.IsEmpty() {
+    historyMsg := wsh.Room.historyMsgQueue.FetchAll()
+    for i := 0; i < len(historyMsg); i++ {
+      wsh.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+      writeMessage := wsh.SetWriteMsg(historyMsg[i])
+      sendMsg, _ := json.Marshal(writeMessage)
+      err := wsh.Conn.WriteMessage(websocket.TextMessage, sendMsg)
+      if err != nil {
+        wsh.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+        log.Println("Write history message to member ", wsh.Username," False")
+        return false
+      }
+    }
+  } else {
+    return false
+  }
+  return true
+}
+
 func (wsh *WsHandler) Register() {
   regInfo := WsRegister{userID: wsh.UserID, user: wsh}
   wsh.Room.register <- regInfo
@@ -133,13 +153,7 @@ func (wsh *WsHandler) WritePump() {
         return
       }
       if message.GetMsgType() == "text" {
-        var wMsg WriteMsg
-        wMsg.Message = message.GetTextMsg()
-        wMsg.MsgType = message.GetMsgType()
-        wMsg.UserID = message.GetUserID()
-        wMsg.Username = message.GetUsername()
-        wMsg.RoomID = message.GetRoomID()
-
+        wMsg := wsh.SetWriteMsg(message)
         sendMsg, _ := json.Marshal(wMsg)
         log.Println("Send JSON to client: ",string(sendMsg))
         err := wsh.Conn.WriteMessage(websocket.TextMessage, sendMsg)
@@ -154,11 +168,20 @@ func (wsh *WsHandler) WritePump() {
       if err := wsh.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
-
-
     }
   }
+}
 
+func (wsh *WsHandler) SetWriteMsg(message Msg) WriteMsg {
+  var wMsg WriteMsg
+  if message.GetMsgType() == "text" {
+    wMsg.Message = message.GetTextMsg()
+    wMsg.MsgType = message.GetMsgType()
+    wMsg.UserID = message.GetUserID()
+    wMsg.Username = message.GetUsername()
+    wMsg.RoomID = message.GetRoomID()
+  }
+  return wMsg
 }
 
 func NewWsHandler() *WsHandler {
