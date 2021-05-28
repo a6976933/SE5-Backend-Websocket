@@ -19,9 +19,12 @@ git pull origin master
 ```
 ### go path setting
 ```
-export PATH=$PATH:yourgoinstallpath/go/bin
+export PATH=$PATH:yourGoInstallPath/go/bin
 ```
 ### download package
+```
+cd projectdir
+```
 ```
 go mod download
 ```
