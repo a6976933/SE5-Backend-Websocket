@@ -17,6 +17,10 @@ git remote add origin git@github.com:a6976933/SE5-Backend-Websocket.git
 ```
 git pull origin master
 ```
+### go path setting
+```
+export PATH=$PATH:yourgoinstallpath/go/bin
+```
 ### download package
 ```
 go mod download
