@@ -3,7 +3,17 @@ se5-backend-websocket server
 
 
 ## 目前進度
-尚未加入JWT功能 預計JWT加密方式是RS256(Asymmetric)
+新增JWT 加密方法為RS256 
+### 生成Key的方式
+生成的Key為PEM檔 因為生成其它格式解碼較為麻煩 採用pbcs8格式
+#### 生成private key
+```
+openssl genrsa -out key.pem 2048
+```
+#### 生成public key
+```
+openssl rsa -in key.pem -pubout -out key.pem.pub
+```
 
 ## 測試的安裝步驟
 ### go install
