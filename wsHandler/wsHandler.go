@@ -3,11 +3,30 @@ package wsHandler
 import (
   "github.com/gorilla/websocket"
   "github.com/gin-gonic/gin"
+  "github.com/dgrijalva/jwt-go"
   "encoding/json"
+  "io/ioutil"
+  //"golang.org/x/crypto/ssh"
+  //"strings"
+  //"strconv"
+  //"math/big"
+  //"crypto/rsa"
+  "errors"
   "net/http"
   "log"
   "time"
+
 )
+
+const (
+  PUBLICKEYPATH = "key.pem.pub"
+)
+
+type JWTClaim struct {
+  UserID int
+  Username string
+  jwt.StandardClaims
+}
 
 type WsRegister struct {
   userID int
@@ -31,6 +50,7 @@ type RecvMsg struct {
   RoomID int `json:"roomID"`
   ImgMessage []byte `json:"img_message"`
   Message string `json:"message"`
+  JWTToken string `json:"jwt"`
 }
 
 type WriteMsg struct {
@@ -45,11 +65,8 @@ type WriteMsg struct {
 
 const (
   maxMsgReadSize = 2048
-
   writeWait = 1 * time.Second
-
   pongWait = 60 * time.Second
-
   pingPeriod = (pongWait * 9) / 10
 )
 
@@ -124,6 +141,41 @@ func (wsh *WsHandler) ReadPump() {
       log.Println(err)
       break
     }
+    log.Println("JWT Token: ",recvMessage.JWTToken)
+    parsetoken, err := jwt.ParseWithClaims(recvMessage.JWTToken, &JWTClaim{}, func(token *jwt.Token) (interface{}, error) {
+        //var err error
+        if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+          return nil, errors.New("Token Algorithm wrong")
+        }
+        if token.Header["typ"] != "JWT" || token.Header["alg"] != "RS256" {
+          return nil, errors.New("Expected typ JWT and alg RS256")
+        }
+
+        pubkeyFile , err := ioutil.ReadFile(PUBLICKEYPATH)
+        if err != nil {
+          log.Println(err," Read Error")
+          return nil, errors.New(err.Error()+" Read Error")
+        }
+        pubkey, err := jwt.ParseRSAPublicKeyFromPEM(pubkeyFile)
+        if err != nil {
+          log.Println(err," Parse Error")
+          return nil, errors.New(err.Error()+" Parse Error")
+        }
+        return pubkey, nil;
+    })
+    if err != nil {
+      log.Println(err, " Parse Token Error")
+      return
+    }
+    if !parsetoken.Valid {
+      log.Println("Token is invalid")
+      return
+    } else {
+      log.Println("Token is valid")
+    }
+    jwtInfo := parsetoken.Claims.(*JWTClaim)
+    log.Println("Name: ", jwtInfo.Username)
+    log.Println("ID: ", jwtInfo.UserID)
     log.Println("Username: ", recvMessage.Username, "Message: ", recvMessage.Message, "Room Name: ", recvMessage.RoomName)
     if recvMessage.MsgType == "text" {
       textMessage.userID = recvMessage.UserID
@@ -143,7 +195,6 @@ func (wsh *WsHandler) WritePump() {
   ticker := time.NewTicker(pingPeriod)
   defer ticker.Stop()
   defer wsh.Conn.Close()
-
   for {
     select {
     case message, ok := <-wsh.broadTextMsg:
@@ -161,7 +212,6 @@ func (wsh *WsHandler) WritePump() {
           wsh.Conn.WriteMessage(websocket.CloseMessage, []byte{})
           return
         }
-
       }
     case <-ticker.C:
       wsh.Conn.SetWriteDeadline(time.Now().Add(writeWait))

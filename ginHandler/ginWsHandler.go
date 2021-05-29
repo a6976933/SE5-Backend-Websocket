@@ -2,11 +2,28 @@ package ginHandler
 
 import (
   "github.com/gin-gonic/gin"
+  "github.com/gorilla/websocket"
   "se5-back-websocket/wsHandler"
+  //"golang.org/x/crypto/ssh"
   "log"
   "encoding/json"
+  "io/ioutil"
   "strconv"
+  "time"
+  "github.com/dgrijalva/jwt-go"
 )
+
+//openssl genrsa -out key.pem 2048
+//openssl rsa -in key.pem -pubout -out key.pem.pub
+
+const (
+  SECRETKEYPATH = "key.pem"
+  MAX_AGE = 10
+)
+
+type jwtRet struct {
+  JWT string `json:"token"`
+}
 
 func WsPing(rm *wsHandler.RoomManager) gin.HandlerFunc {
   fn := func(c *gin.Context) {
@@ -51,6 +68,39 @@ func WsPing(rm *wsHandler.RoomManager) gin.HandlerFunc {
       return
     } else {
       log.Println("Has got the user information, \n name: ", initInfo.Username)
+    }
+    secretKeyFile, err := ioutil.ReadFile(SECRETKEYPATH)
+    if err != nil {
+      log.Println(err)
+    }
+    key, err := jwt.ParseRSAPrivateKeyFromPEM(secretKeyFile)
+
+
+    //key, err := ssh.ParseRawPrivateKey(secretKeyFile)
+
+    if err != nil {
+      log.Println(err)
+    }
+
+
+    customClaim := &wsHandler.JWTClaim{
+      UserID: initInfo.UserID,
+      Username: initInfo.Username,
+      //Pubkey: pubkey,
+      StandardClaims: jwt.StandardClaims{
+        ExpiresAt: time.Now().Add(time.Duration(MAX_AGE)*time.Second).Unix(),
+        Issuer:initInfo.Username,
+      },
+    }
+
+    token := jwt.NewWithClaims(jwt.SigningMethodRS256, customClaim)
+    tokenString, err := token.SignedString(key)
+    log.Println(tokenString)
+    jwtObj := &jwtRet{ JWT: tokenString}
+    sendJWT, _ := json.Marshal(jwtObj)
+    wsH.Conn.WriteMessage(websocket.TextMessage, sendJWT)
+    if err != nil {
+      log.Println(err)
     }
     wsH.Username = initInfo.Username
     wsH.UserID = initInfo.UserID
