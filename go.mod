@@ -10,4 +10,6 @@ require (
 	github.com/securego/gosec v0.0.0-20200401082031-e946c8c39989 // indirect
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/sys v0.0.0-20210525143221-35b2ab0089ea // indirect
+	gorm.io/driver/sqlite v1.1.4
+	gorm.io/gorm v1.21.10
 )

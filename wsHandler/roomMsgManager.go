@@ -3,10 +3,12 @@ package wsHandler
 import (
   "time"
   "log"
+  "gorm.io/gorm"
 )
 
 const (
-  HISTORY_MSG_NUM = 50
+  HISTORY_MSG_NUM = 60
+  LOAD_NUM = 50
 )
 
 type Msg interface {
@@ -62,8 +64,8 @@ func NewMsgQueue() *MsgQueue {
   return instance
 }
 
-func (mq *MsgQueue) InitMsgQueue(msg []Msg) {
-  // Wait ORM Fetching
+func (mq *MsgQueue) InitMsgQueue(msg []Msg, db *gorm.DB) {
+  //db.Model(&RoomRoom{})
 }
 
 func (mq *MsgQueue) IsEmpty() bool {
@@ -107,22 +109,58 @@ type RoomMsgManager struct {
   Name string //room name
   Manager *RoomManager
   OnlineMemberList map[int]*WsHandler
+  UsernameMap map[int]string
+  AccessLevelMap map[int]string
   historyMsgQueue *MsgQueue
   broadcast chan Msg
   register chan WsRegister
   unregister chan int
   message chan Msg
+  RoomInfo *RoomRoom
 }
 
 func NewRoomMsgManager() *RoomMsgManager {
   instance := new(RoomMsgManager)
   instance.OnlineMemberList = make(map[int]*WsHandler)
+  instance.UsernameMap = make(map[int]string)
+  instance.AccessLevelMap = make(map[int]string)
   instance.broadcast = make(chan Msg)
   instance.register = make(chan WsRegister)
   instance.unregister = make(chan int)
   instance.message = make(chan Msg)
   instance.historyMsgQueue = NewMsgQueue()
   return instance
+}
+
+func (rmm *RoomMsgManager) LoadInitInfo(db *gorm.DB) error {
+  result := db.Preload("RoomMemberList").Preload("RoomBlockList").Find(rmm.RoomInfo, rmm.ID)
+  if result.Error != nil {
+    log.Println(result.Error)
+    return result.Error
+  }
+  for _, item := range rmm.RoomInfo.RoomMemberList {
+    rmm.UsernameMap[item.MemberID] = item.Nickname
+    rmm.AccessLevelMap[item.MemberID] = item.AccessLevel
+  }
+  rmm.Name = rmm.RoomInfo.Title
+  result.Error = db.Model(&rmm.RoomInfo).Order("id desc").Limit(LOAD_NUM).Association("RoomMessageList").Find(&rmm.RoomInfo.RoomMessageList)
+
+  if result.Error != nil {
+    log.Println(result.Error)
+    return result.Error
+  }
+  for i := 0; i < len(rmm.RoomInfo.RoomMessageList); i++ {
+    loadMsg := TextMsg{
+      recTime: rmm.RoomInfo.RoomMessageList[i].RecvTime,
+      messageType: "text",
+      username: rmm.UsernameMap[rmm.RoomInfo.RoomMessageList[i].MemberID],
+      userID: rmm.RoomInfo.RoomMessageList[i].MemberID,
+      roomID: rmm.ID,
+      word: rmm.RoomInfo.RoomMessageList[i].Message,
+    }
+    rmm.historyMsgQueue.Push(loadMsg)
+  }
+  return nil
 }
 
 func (rmm *RoomMsgManager) Run() {

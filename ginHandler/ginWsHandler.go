@@ -7,6 +7,7 @@ import (
   //"golang.org/x/crypto/ssh"
   "log"
   "encoding/json"
+  "gorm.io/gorm"
   //"io/ioutil"
   "strconv"
   "time"
@@ -25,7 +26,7 @@ type jwtRet struct {
   JWT string `json:"token"`
 }
 
-func WsPing(rm *wsHandler.RoomManager) gin.HandlerFunc {
+func WsPing(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc {
   fn := func(c *gin.Context) {
     var roomID int
     var err error
@@ -42,11 +43,27 @@ func WsPing(rm *wsHandler.RoomManager) gin.HandlerFunc {
       return
     }
     if !rm.IsRoomExist(roomID) {
+      count := int64(0)
+      err := db.Model(&wsHandler.RoomRoom{}).Where("id = ?", roomID).Count(&count).Error
+      if err != nil {
+        log.Println(err)
+        return
+      }
+      if count != 1 {
+        log.Println("Access Room Error, Request room not Exist")
+        return
+      }
       servingRoom = rm.CreateRoom(roomID)
+      servingRoom.ID = roomID
+      servingRoom.RoomInfo = &wsHandler.RoomRoom{}
+      err = servingRoom.LoadInitInfo(db)
+      if err != nil {
+        return
+      }
     } else {
       servingRoom = rm.LiveRoomList[roomID]
     }
-    go servingRoom.Run()
+    go servingRoom.Run()//
     err = wsH.InitWebsocketConn(c)
     if err != nil {
       log.Println(err)
@@ -58,17 +75,18 @@ func WsPing(rm *wsHandler.RoomManager) gin.HandlerFunc {
     _, message, err := wsH.Conn.ReadMessage()
     if err != nil {
       log.Println(err)
-      //c.String(400, "Data is wrong")
       return
     }
     err = json.Unmarshal(message, &initInfo)
     if err != nil {
       log.Println(err)
-      //c.String(400, "Data is wrong")
       return
     } else {
       log.Println("Has got the user information, \n name: ", initInfo.Username)
     }
+    if _, ok := servingRoom.UsernameMap[initInfo.UserID]; !ok {
+      log.Println("The user "+string(initInfo.UserID)+" is not in the room")
+    } // determine whether the user is in the room by ORM(database data)
     /*
     secretKeyFile, err := ioutil.ReadFile(SECRETKEYPATH)
     if err != nil {
@@ -76,19 +94,14 @@ func WsPing(rm *wsHandler.RoomManager) gin.HandlerFunc {
     }
     */
     key := []byte(wsHandler.KEY)
-
-
     //key, err := ssh.ParseRawPrivateKey(secretKeyFile)
-
     if err != nil {
       log.Println(err)
     }
 
-
     customClaim := &wsHandler.JWTClaim{
       UserID: initInfo.UserID,
       Username: initInfo.Username,
-      //Pubkey: pubkey,
       StandardClaims: jwt.StandardClaims{
         ExpiresAt: time.Now().Add(time.Duration(MAX_AGE)*time.Second).Unix(),
         Issuer:initInfo.Username,
