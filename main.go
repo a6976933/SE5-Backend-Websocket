@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-  const addr = "127.0.0.1:8000"
+  const addr = "127.0.0.1:8090"
   roomManager := wsHandler.NewRoomManager()
   router := gin.Default()
   router.Use(cors.New(ginHandler.CorsConfig()))

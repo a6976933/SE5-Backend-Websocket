@@ -5,7 +5,7 @@ import (
   "github.com/gin-gonic/gin"
   "github.com/dgrijalva/jwt-go"
   "encoding/json"
-  "io/ioutil"
+  //"io/ioutil"
   //"golang.org/x/crypto/ssh"
   //"strings"
   //"strconv"
@@ -19,6 +19,7 @@ import (
 )
 
 const (
+  KEY = "django-insecure-wn1h_@!bp!zbv5lm9dwh63m$hf#bvy+u#ef+i&y3m!&7nw(^15"
   PUBLICKEYPATH = "key.pem.pub"
 )
 
@@ -144,13 +145,13 @@ func (wsh *WsHandler) ReadPump() {
     log.Println("JWT Token: ",recvMessage.JWTToken)
     parsetoken, err := jwt.ParseWithClaims(recvMessage.JWTToken, &JWTClaim{}, func(token *jwt.Token) (interface{}, error) {
         //var err error
-        if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
           return nil, errors.New("Token Algorithm wrong")
         }
-        if token.Header["typ"] != "JWT" || token.Header["alg"] != "RS256" {
-          return nil, errors.New("Expected typ JWT and alg RS256")
+        if token.Header["typ"] != "JWT" || token.Header["alg"] != "HS256" {
+          return nil, errors.New("Expected typ JWT and alg HS256")
         }
-
+        /*
         pubkeyFile , err := ioutil.ReadFile(PUBLICKEYPATH)
         if err != nil {
           log.Println(err," Read Error")
@@ -160,8 +161,9 @@ func (wsh *WsHandler) ReadPump() {
         if err != nil {
           log.Println(err," Parse Error")
           return nil, errors.New(err.Error()+" Parse Error")
-        }
-        return pubkey, nil;
+        }*/ // RS256 code
+        key := []byte(KEY)
+        return key, nil;
     })
     if err != nil {
       log.Println(err, " Parse Token Error")

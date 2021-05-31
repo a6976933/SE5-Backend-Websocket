@@ -7,7 +7,7 @@ import (
   //"golang.org/x/crypto/ssh"
   "log"
   "encoding/json"
-  "io/ioutil"
+  //"io/ioutil"
   "strconv"
   "time"
   "github.com/dgrijalva/jwt-go"
@@ -17,8 +17,8 @@ import (
 //openssl rsa -in key.pem -pubout -out key.pem.pub
 
 const (
-  SECRETKEYPATH = "key.pem"
-  MAX_AGE = 10
+  //SECRETKEYPATH = "key.pem"
+  MAX_AGE = 300
 )
 
 type jwtRet struct {
@@ -69,11 +69,13 @@ func WsPing(rm *wsHandler.RoomManager) gin.HandlerFunc {
     } else {
       log.Println("Has got the user information, \n name: ", initInfo.Username)
     }
+    /*
     secretKeyFile, err := ioutil.ReadFile(SECRETKEYPATH)
     if err != nil {
       log.Println(err)
     }
-    key, err := jwt.ParseRSAPrivateKeyFromPEM(secretKeyFile)
+    */
+    key := []byte(wsHandler.KEY)
 
 
     //key, err := ssh.ParseRawPrivateKey(secretKeyFile)
@@ -93,7 +95,7 @@ func WsPing(rm *wsHandler.RoomManager) gin.HandlerFunc {
       },
     }
 
-    token := jwt.NewWithClaims(jwt.SigningMethodRS256, customClaim)
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, customClaim)
     tokenString, err := token.SignedString(key)
     log.Println(tokenString)
     jwtObj := &jwtRet{ JWT: tokenString}
