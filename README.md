@@ -3,8 +3,9 @@ se5-backend-websocket server
 
 
 ## 目前進度
-新增JWT 加密方法為RS256
-將要做的事: 做ORM 開API 去Commit front-end
+JWT 加密方法為HS256
+完成ORM存取 
+剩餘事項: 開API 去Commit front-end 通知系統
 ### 生成Key的方式
 生成的Key為PEM檔 因為生成其它格式解碼較為麻煩 採用pbcs8格式
 #### 生成private key
