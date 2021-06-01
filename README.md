@@ -4,8 +4,10 @@ se5-backend-websocket server
 
 ## 目前進度
 JWT 加密方法為HS256
-完成ORM存取 
-剩餘事項: 開API 去Commit front-end 通知系統
+完成ORM存取
+完成通知系統(或剩下要討論的地方?)
+尚未tested
+剩餘事項: 去Commit front-end
 
 ## 測試的安裝步驟
 ### go install
