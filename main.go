@@ -1,59 +1,72 @@
 package main
 
 import (
-  "github.com/gin-gonic/gin"
-  "github.com/gin-contrib/cors"
-  "se5-back-websocket/ginHandler"
-  "se5-back-websocket/wsHandler"
-  "gorm.io/gorm"
-  "log"
-  //"strconv"
-  //"time"
-  "gorm.io/driver/sqlite"
+	"log"
+	"se5-back-websocket/ginHandler"
+	"se5-back-websocket/wsHandler"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+
+	//"strconv"
+	//"time"
+	"gorm.io/driver/sqlite"
 )
 
-
 func initDatabase(dsn string) (*gorm.DB, error) {
-  db, err := gorm.Open(sqlite.Open(dsn),&gorm.Config{})
-  if err != nil {
-    log.Println(err)
-    return nil, err
-  }
-  return db, nil
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	return db, nil
 }
 
 func main() {
-  const addr = "127.0.0.1:8090"
-  const dsn = "/Users/allenwang/se5-back/db.sqlite3"
-  db, err := initDatabase(dsn)
-  if err != nil {
-    return
-  }
-/*
-  for i := 1; i < 10 ; i++ {
-    test := wsHandler.Room_Roommessage{ID:i+118,RoomID:1445,MemberID:22,Message:"靠"+strconv.Itoa(i),RecvTime:time.Now()}
-    result := db.Create(&test)
-    if result.Error != nil {
-      log.Println(result.Error)
-      return
-    }
-  }*/
-  roomManager := wsHandler.NewRoomManager()
-  router := gin.Default()
-  router.Use(cors.New(ginHandler.CorsConfig()))
-  roomRoute := router.Group("/ws/room")
-  {
-    roomRoute.GET("/:roomID", ginHandler.WsPing(roomManager, db))
-  }
-  //roomNotify := router.Group("/wsServer/notify")
-  {
-    //roomNotify.POST("/room/:id/remove")
-    //roomNotify.POST("/room/:id/invite")
-    //roomNotify.POST("/room/:id/block")
-    //roomNotify.POST("/room/:id/priorityChange")
-    //roomNotify.POST("/room/:id/join")
-  }
+	const addr = "127.0.0.1:8090"
+	const dsn = "/Users/allenwang/se5-back/db.sqlite3"
+	db, err := initDatabase(dsn)
+	if err != nil {
+		return
+	}
+	var messageID = int64(0)
+	err = db.Model(&wsHandler.Room_Roommessage{}).Count(&messageID).Error
+	if err != nil {
+		log.Println(err)
+	}
+	log.Println(messageID)
+	/*
+	  for i := 1; i < 10 ; i++ {
+	    test := wsHandler.Room_Roommessage{RoomID:1,MemberID:6,Message:"上課囉AAAAAAAAA"+strconv.Itoa(i),RecvTime:time.Now()}
+	    //messageID += 1
+	    result := db.Create(&test)
+	    if result.Error != nil {
+	      log.Println(result.Error)
+	      return
+	    }
+	  }*/
+	roomManager := wsHandler.NewRoomManager()
+	userManager := wsHandler.NewOnlineUserManager()
+	router := gin.Default()
+	router.Use(cors.New(ginHandler.CorsConfig()))
+	roomRoute := router.Group("/ws/room")
+	{
+		roomRoute.GET("/:roomID", ginHandler.RoomConnectHandler(roomManager, db))
+	}
+	//roomNotify := router.Group("/wsServer/notify/room")
+	{
+		//roomNotify.POST("/room/:id/remove")
+		//roomNotify.POST("/room/:id/invite")
+		//roomNotify.POST("/room/:id/block")
+		//roomNotify.POST("/room/:id/priorityChange")
+		//roomNotify.POST("/room/:id/join")
+	}
+	UserNotify := router.Group("/wsServer/notify/user")
+	{
+		UserNotify.GET("/:id", ginHandler.UserNotifyConnectionHandler(userManager, db))
+	}
 
-  router.Run(addr)
+	router.Run(addr)
 
 }
