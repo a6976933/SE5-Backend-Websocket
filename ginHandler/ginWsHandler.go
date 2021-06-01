@@ -8,7 +8,9 @@ import (
 
 	//"golang.org/x/crypto/ssh"
 	"encoding/json"
+	"errors"
 	"log"
+	"net/http"
 
 	"gorm.io/gorm"
 
@@ -24,7 +26,8 @@ import (
 
 const (
 	//SECRETKEYPATH = "key.pem"
-	MAX_AGE = 300
+	MAX_AGE   = 300
+	DJANGO_IP = "127.0.0.1"
 )
 
 type jwtRet struct {
@@ -38,13 +41,11 @@ func RoomConnectHandler(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc 
 		var servingRoom *wsHandler.RoomMsgManager
 		var initInfo = new(wsHandler.RecvMsg)
 		wsH := wsHandler.NewWsHandler()
-		/*
-		   if reflect.TypeOf(c.Param("roomID")).String() != "string"{
-		     c.String("404", "Page Not Found")
-		   }*/
 		if roomID, err = strconv.Atoi(c.Param("roomID")); err != nil {
 			log.Println(err)
-			c.String(404, "Room Not Found")
+			c.JSON(http.StatusNotFound, gin.H{
+				"detail": "Room Not Found",
+			})
 			return
 		}
 		if !rm.IsRoomExist(roomID) {
@@ -76,7 +77,9 @@ func RoomConnectHandler(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc 
 		err = wsH.InitWebsocketConn(c)
 		if err != nil {
 			log.Println(err)
-			c.String(400, "Websocket error")
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail": "Websocket error",
+			})
 			return
 		} else {
 			log.Println("Someone connect to the room ID: ", roomID)
@@ -141,7 +144,9 @@ func UserNotifyConnectionHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) 
 		var UserOnline *wsHandler.OnlineUser
 		if userID, err = strconv.Atoi(c.Param("id")); err != nil {
 			log.Println(err)
-			c.String(404, "User Not Found")
+			c.JSON(http.StatusNotFound, gin.H{
+				"detail": "User Not Found",
+			})
 			return
 		}
 		if !oum.IsUserExist(userID) {
@@ -149,12 +154,16 @@ func UserNotifyConnectionHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) 
 			err := db.Model(&wsHandler.UserCustomer{}).Where("id = ?", userID).Count(&count).Error
 			if err != nil {
 				log.Println(err)
-				c.String(404, "User Not Found")
+				c.JSON(http.StatusNotFound, gin.H{
+					"detail": "User Not Found",
+				})
 				return
 			}
 			if count != 1 {
 				log.Println("Query User Error, Has two User")
-				c.String(500, "Query User Error")
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"detail": "Query User Error",
+				})
 				return
 			}
 			UserOnline = wsHandler.NewOnlineUser()
@@ -171,7 +180,9 @@ func UserNotifyConnectionHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) 
 		err = UserOnline.InitWebsocketConn(c)
 		if err != nil {
 			log.Println(err)
-			c.String(400, "Websocket error")
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail": "Websocket error",
+			})
 			return
 		} else {
 			log.Println("User ID connect: ", UserOnline.ID)
@@ -197,6 +208,160 @@ func UserNotifyConnectionHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) 
 		if err != nil {
 			return
 		}
+	}
+	return gin.HandlerFunc(fn)
+}
+
+func checkIP(c *gin.Context) error {
+	if c.ClientIP() != DJANGO_IP {
+		log.Println("Warning!!! Non server IP request our machine!!!")
+		c.JSON(http.StatusNotFound, gin.H{
+			"detail": "Page Not Found",
+		})
+		return errors.New("Warning!!! Non server IP request our machine!!!")
+	}
+	return nil
+}
+
+func RoomMemberRemoveHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc {
+	fn := func(c *gin.Context) {
+		var roomID int
+		err := checkIP(c)
+		if err != nil {
+			return
+		}
+		rmMessage := &wsHandler.RemoveMsg{}
+		err = c.BindJSON(&rmMessage)
+		if err != nil {
+			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail": "Your JSON data format is wrong",
+			})
+		}
+		roomID, err = strconv.Atoi(c.Param("id"))
+		if err != nil {
+			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail": "Your ID is wrong",
+			})
+			return
+		}
+		modifiedRoom := rm.LiveRoomList[roomID]
+		if modifiedRoom.IsMemberInRoom(rmMessage.RemovedUserID) {
+			delete(modifiedRoom.AccessLevelMap, rmMessage.RemovedUserID)
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"detail": "Successful remove user from room",
+		})
+		//Sending Notification to front-end by WebSocket
+
+	}
+	return gin.HandlerFunc(fn)
+}
+
+func RoomMemberJoinHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc {
+	fn := func(c *gin.Context) {
+		var roomID int
+		err := checkIP(c)
+		if err != nil {
+			return
+		}
+		joinMessage := &wsHandler.JoinMsg{}
+		err = c.BindJSON(&joinMessage)
+		if err != nil {
+			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail": "Your JSON data format is wrong",
+			})
+		}
+		roomID, err = strconv.Atoi(c.Param("id"))
+		if err != nil {
+			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail": "Your ID is wrong",
+			})
+			return
+		}
+		modifiedRoom := rm.LiveRoomList[roomID]
+		if !modifiedRoom.IsMemberInRoom(joinMessage.JoinUserID) {
+			modifiedRoom.AccessLevelMap[joinMessage.JoinUserID] = "user"
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"detail": "Successful join user from room",
+		})
+		//Sending Notification to front-end by WebSocket
+
+	}
+	return gin.HandlerFunc(fn)
+}
+
+func RoomUpdateHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc {
+	fn := func(c *gin.Context) {
+		var roomID int
+		err := checkIP(c)
+		if err != nil {
+			return
+		}
+		updateMessage := &wsHandler.UpdateMsg{}
+		err = c.BindJSON(&updateMessage)
+		if err != nil {
+			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail": "Your JSON data format is wrong",
+			})
+		}
+		roomID, err = strconv.Atoi(c.Param("id"))
+		if err != nil {
+			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail": "Your ID is wrong",
+			})
+			return
+		}
+		modifiedRoom := rm.LiveRoomList[roomID]
+		c.JSON(http.StatusOK, gin.H{
+			"detail": "Successful update",
+		})
+		log.Println(modifiedRoom.ID)
+	}
+	return gin.HandlerFunc(fn)
+}
+
+func BackendUserNotifyHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) gin.HandlerFunc {
+	fn := func(c *gin.Context) {
+		var userID int
+		//var user *wsHandler.OnlineUser
+		err := checkIP(c)
+		if err != nil {
+			return
+		}
+		userNotify := &wsHandler.UserNotificationMsg{}
+		err = c.BindJSON(&userNotify)
+		if err != nil {
+			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail": "Your JSON data format is wrong",
+			})
+		}
+		userID, err = strconv.Atoi(c.Param("id"))
+		if err != nil {
+			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail": "Your ID is wrong",
+			})
+			return
+		}
+		if _, ok := oum.OnlineUserList[userID]; !ok {
+			c.JSON(http.StatusOK, gin.H{
+				"detail": "User isn't online",
+			})
+			return
+		}
+		userNotify.NotifyUserID = userID
+		c.JSON(http.StatusOK, gin.H{
+			"detail": "Send Success",
+		})
+		oum.Notify <- *userNotify
 	}
 	return gin.HandlerFunc(fn)
 }

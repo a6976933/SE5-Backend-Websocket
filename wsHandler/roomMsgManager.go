@@ -163,6 +163,7 @@ func (rmm *RoomMsgManager) LoadInitInfo(db *gorm.DB) error {
 		rmm.UsernameMap[item.MemberID] = item.Nickname
 		rmm.AccessLevelMap[item.MemberID] = item.AccessLevel
 	}
+	rmm.RoomInfo.RoomMemberList = nil
 	rmm.Name = rmm.RoomInfo.Title
 	result.Error = db.Model(&rmm.RoomInfo).Order("id desc").Limit(LOAD_NUM).Association("RoomMessageList").Find(&rmm.RoomInfo.RoomMessageList)
 
@@ -182,6 +183,14 @@ func (rmm *RoomMsgManager) LoadInitInfo(db *gorm.DB) error {
 		rmm.historyMsgQueue.Push(loadMsg)
 	}
 	return nil
+}
+
+func (rmm *RoomMsgManager) IsMemberInRoom(userID int) bool {
+	if _, ok := rmm.AccessLevelMap[userID]; ok {
+		return true
+	} else {
+		return false
+	}
 }
 
 func (rmm *RoomMsgManager) SaveMsg2DBByNumber(db *gorm.DB) {

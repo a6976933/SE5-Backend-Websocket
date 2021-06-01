@@ -1,22 +1,46 @@
 package wsHandler
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
-	//"time"
 )
+
+type RemoveMsg struct {
+	RemoveUserID  int `json:"remove_userID"`
+	RemovedUserID int `json:"removed_userID"`
+}
+
+type JoinMsg struct {
+	JoinUserID int `json:"join_userID"`
+}
+
+type UpdateMsg struct {
+	UpdateItem string `json:"update_item"`
+	UpdateData string `json:"update_data"`
+}
+
+type UserNotificationMsg struct {
+	NotifyType     string `json:"notify_type"`
+	NotifyString   string `json:"notify_string"`
+	DoNotifyUserID int    `json:"notify_userID"`
+	NotifyRoomID   int    `json:"notify_roomID"`
+	NotifyUserID   int    `json:"notified_userID"`
+}
 
 type OnlineUserManager struct {
 	onlineUserCnt  int
 	register       chan OnlineUserRegister
 	unregister     chan int
+	Notify         chan UserNotificationMsg
 	OnlineUserList map[int]*OnlineUser
 }
 
@@ -27,6 +51,33 @@ func (oum *OnlineUserManager) AddUser(userID int, user *OnlineUser) error {
 	}
 	log.Println("User Exist Error")
 	return errors.New("User Exist Error")
+}
+
+func (oum *OnlineUserManager) Run() {
+	for {
+		select {
+		case message := <-oum.Notify:
+			user := oum.OnlineUserList[message.NotifyUserID]
+			go func(user *OnlineUser, msg UserNotificationMsg) {
+				ticker := time.NewTicker(pingPeriod)
+				defer ticker.Stop()
+				marshMsg, _ := json.Marshal(msg)
+				err := user.Conn.WriteMessage(websocket.TextMessage, marshMsg)
+				if err != nil {
+					user.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+					user.Unregister()
+				}
+			}(user, message)
+		case userID := <-oum.unregister:
+			if userObj, ok := oum.OnlineUserList[userID]; ok {
+				userObj.Conn.Close()
+				close(userObj.notifyMsg)
+				delete(oum.OnlineUserList, userID)
+			}
+		case userReg := <-oum.register:
+			oum.OnlineUserList[userReg.userID] = userReg.user
+		}
+	}
 }
 
 func (oum *OnlineUserManager) IsUserExist(userID int) bool {
@@ -41,6 +92,7 @@ func NewOnlineUserManager() *OnlineUserManager {
 	instance := new(OnlineUserManager)
 	instance.OnlineUserList = make(map[int]*OnlineUser)
 	instance.onlineUserCnt = 0
+	instance.Notify = make(chan UserNotificationMsg)
 	instance.register = make(chan OnlineUserRegister)
 	instance.unregister = make(chan int)
 	return instance
@@ -119,6 +171,10 @@ func (ou *OnlineUser) InitWebsocketConn(c *gin.Context) error {
 func (ou *OnlineUser) Register() {
 	regInfo := OnlineUserRegister{userID: ou.ID, user: ou}
 	ou.UserManager.register <- regInfo
+}
+
+func (ou *OnlineUser) Unregister() {
+	ou.UserManager.unregister <- ou.ID
 }
 
 func JWTAuthentication(token string) (bool, int) {

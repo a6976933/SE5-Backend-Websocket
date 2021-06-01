@@ -48,21 +48,24 @@ func main() {
 	  }*/
 	roomManager := wsHandler.NewRoomManager()
 	userManager := wsHandler.NewOnlineUserManager()
+	userManager.Run()
 	router := gin.Default()
 	router.Use(cors.New(ginHandler.CorsConfig()))
 	roomRoute := router.Group("/ws/room")
 	{
 		roomRoute.GET("/:roomID", ginHandler.RoomConnectHandler(roomManager, db))
 	}
-	//roomNotify := router.Group("/wsServer/notify/room")
+	roomNotify := router.Group("/wsServer/notify/room")
 	{
-		//roomNotify.POST("/room/:id/remove")
-		//roomNotify.POST("/room/:id/invite")
-		//roomNotify.POST("/room/:id/block")
-		//roomNotify.POST("/room/:id/priorityChange")
-		//roomNotify.POST("/room/:id/join")
+		roomNotify.POST("/:id/remove", ginHandler.RoomMemberRemoveHandler(userManager, roomManager, db))
+		roomNotify.POST("/:id/join", ginHandler.RoomMemberJoinHandler(userManager, roomManager, db))
+		roomNotify.POST("/:id/update", ginHandler.RoomUpdateHandler(userManager, roomManager, db))
 	}
-	UserNotify := router.Group("/wsServer/notify/user")
+	backendUserNotify := router.Group("/wsServer/notify/user")
+	{
+		backendUserNotify.POST("/:id", ginHandler.BackendUserNotifyHandler(userManager, db))
+	}
+	UserNotify := router.Group("/wsServer/connection/user")
 	{
 		UserNotify.GET("/:id", ginHandler.UserNotifyConnectionHandler(userManager, db))
 	}
