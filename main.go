@@ -48,7 +48,7 @@ func main() {
 	  }*/
 	roomManager := wsHandler.NewRoomManager()
 	userManager := wsHandler.NewOnlineUserManager()
-	userManager.Run()
+	go userManager.Run()
 	router := gin.Default()
 	router.Use(cors.New(ginHandler.CorsConfig()))
 	roomRoute := router.Group("/ws/room")
