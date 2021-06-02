@@ -14,6 +14,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	OFFLINE_TIME   = 12
+	WRITE_DEADLINE = 10
+)
+
 type RemoveMsg struct {
 	RemoveUserID  int `json:"remove_userID"`
 	RemovedUserID int `json:"removed_userID"`
@@ -49,8 +54,8 @@ func (oum *OnlineUserManager) AddUser(userID int, user *OnlineUser) error {
 		oum.OnlineUserList[userID] = user
 		return nil
 	}
-	log.Println("User Exist Error")
-	return errors.New("User Exist Error")
+	log.Println("User is exist")
+	return errors.New("User is exist")
 }
 
 func (oum *OnlineUserManager) Run() {
@@ -65,16 +70,17 @@ func (oum *OnlineUserManager) Run() {
 				err := user.Conn.WriteMessage(websocket.TextMessage, marshMsg)
 				if err != nil {
 					user.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-					user.Unregister()
+					user.Conn.Close()
 				}
 			}(user, message)
 		case userID := <-oum.unregister:
-			if userObj, ok := oum.OnlineUserList[userID]; ok {
-				userObj.Conn.Close()
-				close(userObj.notifyMsg)
+			if _, ok := oum.OnlineUserList[userID]; ok {
+				log.Println("User ", userID, " Leave!")
 				delete(oum.OnlineUserList, userID)
+				oum.onlineUserCnt--
 			}
 		case userReg := <-oum.register:
+			log.Println("User ID: ", userReg.userID, " is register")
 			oum.OnlineUserList[userReg.userID] = userReg.user
 		}
 	}
@@ -86,6 +92,10 @@ func (oum *OnlineUserManager) IsUserExist(userID int) bool {
 	} else {
 		return false
 	}
+}
+
+func (oum *OnlineUserManager) UserCntReport() {
+	log.Println("Now online people numbers: ", len(oum.OnlineUserList))
 }
 
 func NewOnlineUserManager() *OnlineUserManager {
@@ -112,10 +122,11 @@ type OnlineUser struct {
 	Upgrader    *websocket.Upgrader
 	Conn        *websocket.Conn
 	UserManager *OnlineUserManager
-	UserInfo    *UserCustomer
-	notifyMsg   chan Msg
+	UserInfo    *UserCustomuser
 	Username    string
 	ID          int
+	Tick        *time.Ticker
+	Online      bool
 }
 
 func NewOnlineUser() *OnlineUser {
@@ -123,13 +134,12 @@ func NewOnlineUser() *OnlineUser {
 	rbSize := 2048
 	wbSize := 2048
 	instance.initUpgrader(rbSize, wbSize)
-	instance.notifyMsg = make(chan Msg)
 	return instance
 }
 
 func (ou *OnlineUser) LoadInitInfo(db *gorm.DB) error {
 	count := int64(0)
-	result := db.Model(&UserCustomer{}).Where("id = ?", strconv.Itoa(ou.ID)).Count(&count)
+	result := db.Model(&UserCustomuser{}).Where("id = ?", strconv.Itoa(ou.ID)).Count(&count)
 	if count == 0 {
 		log.Println("Can't find the user by user ID")
 		return errors.New("Can't find the user by user ID")
@@ -168,6 +178,27 @@ func (ou *OnlineUser) InitWebsocketConn(c *gin.Context) error {
 	return nil
 }
 
+func (ou *OnlineUser) TestConnection() {
+	ou.Tick = time.NewTicker(OFFLINE_TIME * time.Second)
+	//ou.Conn.SetWriteDeadline(time.Now().Add(WRITE_DEADLINE * time.Second))
+	defer ou.Conn.Close()
+	for {
+		select {
+		case <-ou.Tick.C:
+			ou.Conn.SetWriteDeadline(time.Now().Add(WRITE_DEADLINE * time.Second))
+			msg := []byte(`{"res": "Fuck"}`)
+			err := ou.Conn.WriteMessage(websocket.TextMessage, msg)
+			if err != nil {
+				log.Println(err, "Can't write user")
+				ou.Unregister()
+				return
+			} else {
+				ou.Tick = time.NewTicker(OFFLINE_TIME * time.Second)
+			}
+		}
+	}
+}
+
 func (ou *OnlineUser) Register() {
 	regInfo := OnlineUserRegister{userID: ou.ID, user: ou}
 	ou.UserManager.register <- regInfo
@@ -196,7 +227,10 @@ func JWTAuthentication(token string) (bool, int) {
 		log.Println("Token is invalid")
 		return false, -1
 	}
-	jwtInfo := parsetoken.Claims.(*JWTClaim)
-	log.Println("Token is valid, User ID: ", jwtInfo.UserID)
-	return true, jwtInfo.UserID
+	if jwtInfo, ok := parsetoken.Claims.(*JWTClaim); ok {
+		log.Println("Token is valid, User ID: ", jwtInfo.UserID)
+		return true, jwtInfo.UserID
+	}
+	return false, -1
+
 }

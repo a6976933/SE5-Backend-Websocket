@@ -13,7 +13,7 @@ type Room_Roommessage struct {
 	RecvTime time.Time
 }
 
-type UserCustomer struct {
+type UserCustomuser struct {
 	ID          int `gorm:"primaryKey"`
 	Password    string
 	LastLogin   *time.Time `gorm:"type:datetime"`
@@ -99,8 +99,8 @@ func (RoomRoom) TableName() string {
 	return "room_room"
 }
 
-func (UserCustomer) TableName() string {
-	return "user_customer"
+func (UserCustomuser) TableName() string {
+	return "user_customuser"
 }
 
 func (RoomRoomblock) TableName() string {

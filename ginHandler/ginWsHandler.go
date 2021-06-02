@@ -151,7 +151,7 @@ func UserNotifyConnectionHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) 
 		}
 		if !oum.IsUserExist(userID) {
 			count := int64(0)
-			err := db.Model(&wsHandler.UserCustomer{}).Where("id = ?", userID).Count(&count).Error
+			err := db.Model(&wsHandler.UserCustomuser{}).Where("id = ?", userID).Count(&count).Error
 			if err != nil {
 				log.Println(err)
 				c.JSON(http.StatusNotFound, gin.H{
@@ -168,14 +168,18 @@ func UserNotifyConnectionHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) 
 			}
 			UserOnline = wsHandler.NewOnlineUser()
 			UserOnline.ID = userID
-			UserOnline.UserInfo = &wsHandler.UserCustomer{}
+			UserOnline.UserInfo = &wsHandler.UserCustomuser{}
 			err = UserOnline.LoadInitInfo(db)
 			if err != nil {
 				return
 			}
-		} else { // Usually can't go to here
+			UserOnline.UserManager = oum
+			UserOnline.Online = false
+			UserOnline.Register()
+		} else {
 			UserOnline = oum.OnlineUserList[userID]
 			UserOnline.ID = userID
+			UserOnline.Online = true
 		}
 		err = UserOnline.InitWebsocketConn(c)
 		if err != nil {
@@ -205,9 +209,28 @@ func UserNotifyConnectionHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) 
 			return
 		}
 		err = oum.AddUser(UserOnline.ID, UserOnline)
+		retMsg := []byte(`{"res": "Success Connect"}`)
+		UserOnline.Conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
+		err = UserOnline.Conn.WriteMessage(websocket.TextMessage, retMsg)
 		if err != nil {
+			log.Println(err)
+			UserOnline.Conn.Close()
 			return
 		}
+		log.Println("User ", UserOnline.ID, " Online!")
+		if !UserOnline.Online {
+			go UserOnline.TestConnection()
+			UserOnline.Online = true
+		}
+		time.Sleep(4 * time.Second)
+		UserOnline.Conn.SetWriteDeadline(time.Now().Add(4 * time.Second))
+		err = UserOnline.Conn.WriteMessage(websocket.TextMessage, retMsg)
+		if err != nil {
+			log.Println(err, "Write Error")
+			UserOnline.Conn.Close()
+			return
+		}
+		oum.UserCntReport()
 	}
 	return gin.HandlerFunc(fn)
 }

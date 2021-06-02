@@ -25,7 +25,7 @@ const (
 )
 
 type JWTClaim struct {
-	UserID int
+	UserID int `json:"user_id"`
 	//Username string
 	jwt.StandardClaims
 }
