@@ -13,7 +13,7 @@ import (
 	//"strconv"
 	//"math/big"
 	//"crypto/rsa"
-	"errors"
+
 	"log"
 	"net/http"
 	"time"
@@ -44,7 +44,14 @@ type WsHandler struct {
 	UserID       int
 }
 
+type RoomRequestConnectionMsg struct {
+	UserID int    `json:"user_id"`
+	RoomID int    `json:"room_id"`
+	Token  string `json:"token"`
+}
+
 type RecvMsg struct {
+	Header     string `json:"header"`
 	UserID     int    `json:"userID"`
 	Username   string `json:"user_name"`
 	MsgType    string `json:"msg_type"`
@@ -52,17 +59,19 @@ type RecvMsg struct {
 	RoomID     int    `json:"roomID"`
 	ImgMessage []byte `json:"img_message"`
 	Message    string `json:"message"`
-	JWTToken   string `json:"jwt"`
+	JWTToken   string `json:"token"`
 }
 
 type WriteMsg struct {
-	UserID     int    `json:"userID"`
-	Username   string `json:"username"`
-	MsgType    string `json:"msg_type"`
-	RoomName   string `json:"room_name"`
-	RoomID     int    `json:"roomID"`
-	ImgMessage []byte `json:"img_message"`
-	Message    string `json:"message"`
+	Header     string    `json:"header"`
+	UserID     int       `json:"userID"`
+	Username   string    `json:"username"`
+	MsgType    string    `json:"msg_type"`
+	RoomName   string    `json:"room_name"`
+	RoomID     int       `json:"roomID"`
+	MsgTime    time.Time `json:"time"`
+	ImgMessage []byte    `json:"img_message"`
+	Message    string    `json:"message"`
 }
 
 const (
@@ -123,8 +132,6 @@ func (wsh *WsHandler) ReadPump() {
 		wsh.Conn.Close()
 		wsh.Room.unregister <- wsh.UserID
 	}()
-	wsh.Conn.SetReadDeadline(time.Now().Add(pongWait))
-	wsh.Conn.SetPongHandler(func(string) error { wsh.Conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 
 	for {
 		var textMessage TextMsg
@@ -143,51 +150,23 @@ func (wsh *WsHandler) ReadPump() {
 			log.Println(err)
 			break
 		}
-		log.Println("JWT Token: ", recvMessage.JWTToken)
-		parsetoken, err := jwt.ParseWithClaims(recvMessage.JWTToken, &JWTClaim{}, func(token *jwt.Token) (interface{}, error) {
-			//var err error
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, errors.New("Token Algorithm wrong")
-			}
-			if token.Header["typ"] != "JWT" || token.Header["alg"] != "HS256" {
-				return nil, errors.New("Expected typ JWT and alg HS256")
-			}
-			/*
-			   pubkeyFile , err := ioutil.ReadFile(PUBLICKEYPATH)
-			   if err != nil {
-			     log.Println(err," Read Error")
-			     return nil, errors.New(err.Error()+" Read Error")
-			   }
-			   pubkey, err := jwt.ParseRSAPublicKeyFromPEM(pubkeyFile)
-			   if err != nil {
-			     log.Println(err," Parse Error")
-			     return nil, errors.New(err.Error()+" Parse Error")
-			   }*/ // RS256 code
-			key := []byte(KEY)
-			return key, nil
-		})
-		if err != nil {
-			log.Println(err, " Parse Token Error")
+		log.Println(recvMessage)
+		isValid, JWTID := JWTAuthentication(recvMessage.JWTToken)
+		if !isValid || JWTID != recvMessage.UserID {
+			wsh.Conn.Close()
+			log.Println("Token Invalid!!!", JWTID, recvMessage.UserID)
 			return
 		}
-		if !parsetoken.Valid {
-			log.Println("Token is invalid")
-			return
-		} else {
-			log.Println("Token is valid")
-		}
-		jwtInfo := parsetoken.Claims.(*JWTClaim)
-		//log.Println("Name: ", jwtInfo.Username)
-		log.Println("ID: ", jwtInfo.UserID)
-		log.Println("Username: ", recvMessage.Username, "Message: ", recvMessage.Message, "Room Name: ", recvMessage.RoomName)
-		if recvMessage.MsgType == "text" {
-			textMessage.userID = recvMessage.UserID
-			textMessage.roomID = recvMessage.RoomID
-			textMessage.username = recvMessage.Username
-			textMessage.word = recvMessage.Message
-			textMessage.messageType = "text"
-			textMessage.recTime = time.Now()
-			wsh.Room.broadcast <- textMessage
+		if recvMessage.Header == "message" {
+			if recvMessage.MsgType == "text" {
+				textMessage.userID = recvMessage.UserID
+				textMessage.roomID = recvMessage.RoomID
+				//textMessage.username = recvMessage.Username
+				textMessage.word = recvMessage.Message
+				textMessage.messageType = "text"
+				textMessage.recTime = time.Now()
+				wsh.Room.broadcast <- textMessage
+			}
 		}
 
 	}
@@ -218,7 +197,9 @@ func (wsh *WsHandler) WritePump() {
 			}
 		case <-ticker.C:
 			wsh.Conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := wsh.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			msg := []byte(`{"header":"ping","ping": "ping"}`)
+			if err := wsh.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				wsh.Room.unregister <- wsh.UserID
 				return
 			}
 		}
@@ -233,6 +214,8 @@ func (wsh *WsHandler) SetWriteMsg(message Msg) WriteMsg {
 		wMsg.UserID = message.GetUserID()
 		wMsg.Username = message.GetUsername()
 		wMsg.RoomID = message.GetRoomID()
+		wMsg.MsgTime = message.GetTime()
+		wMsg.Header = "message"
 	}
 	return wMsg
 }

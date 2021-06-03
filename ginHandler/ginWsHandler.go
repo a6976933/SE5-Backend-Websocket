@@ -17,8 +17,6 @@ import (
 	//"io/ioutil"
 	"strconv"
 	"time"
-
-	"github.com/dgrijalva/jwt-go"
 )
 
 //openssl genrsa -out key.pem 2048
@@ -39,7 +37,7 @@ func RoomConnectHandler(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc 
 		var roomID int
 		var err error
 		var servingRoom *wsHandler.RoomMsgManager
-		var initInfo = new(wsHandler.RecvMsg)
+		var initInfo = new(wsHandler.RoomRequestConnectionMsg)
 		wsH := wsHandler.NewWsHandler()
 		if roomID, err = strconv.Atoi(c.Param("roomID")); err != nil {
 			log.Println(err)
@@ -94,38 +92,23 @@ func RoomConnectHandler(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc 
 			log.Println(err)
 			return
 		} else {
-			log.Println("Has got the user information, \n name: ", initInfo.Username)
+			//log.Println("Has got the user information, \n name: ", initInfo.Username)
 		}
 
 		if _, ok := servingRoom.UsernameMap[initInfo.UserID]; !ok {
-			log.Println("The user " + string(initInfo.UserID) + " is not in the room")
+			log.Println("The user " + strconv.Itoa(initInfo.UserID) + " is not in the room, Invalid Access!!!!!")
+			log.Println("So Close the Connection!!!")
+			wsH.Conn.Close()
+			return
 		}
 
-		key := []byte(wsHandler.KEY)
-		if err != nil {
-			log.Println(err)
+		isValid, JWTID := wsHandler.JWTAuthentication(initInfo.Token)
+		if !isValid || JWTID != initInfo.UserID {
+			wsH.Conn.Close()
+			log.Println("Token Invalid!!!")
+			return
 		}
 
-		//-----------
-		customClaim := &wsHandler.JWTClaim{
-			UserID: initInfo.UserID,
-			//Username: initInfo.Username,
-			StandardClaims: jwt.StandardClaims{
-				ExpiresAt: time.Now().Add(time.Duration(MAX_AGE) * time.Second).Unix(),
-				Issuer:    initInfo.Username,
-			},
-		}
-
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, customClaim)
-		tokenString, err := token.SignedString(key)
-		log.Println(tokenString)
-		jwtObj := &jwtRet{JWT: tokenString}
-		sendJWT, _ := json.Marshal(jwtObj)
-		wsH.Conn.WriteMessage(websocket.TextMessage, sendJWT)
-		if err != nil {
-			log.Println(err)
-		}
-		wsH.Username = initInfo.Username
 		wsH.UserID = initInfo.UserID
 		wsH.Room = servingRoom
 		wsH.Register()
@@ -209,7 +192,7 @@ func UserNotifyConnectionHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) 
 			return
 		}
 		err = oum.AddUser(UserOnline.ID, UserOnline)
-		retMsg := []byte(`{"res": "Success Connect"}`)
+		retMsg := []byte(`{"header": "setConn","res": "Success Connect"}`)
 		UserOnline.Conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 		err = UserOnline.Conn.WriteMessage(websocket.TextMessage, retMsg)
 		if err != nil {
@@ -221,14 +204,6 @@ func UserNotifyConnectionHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) 
 		if !UserOnline.Online {
 			go UserOnline.TestConnection()
 			UserOnline.Online = true
-		}
-		time.Sleep(4 * time.Second)
-		UserOnline.Conn.SetWriteDeadline(time.Now().Add(4 * time.Second))
-		err = UserOnline.Conn.WriteMessage(websocket.TextMessage, retMsg)
-		if err != nil {
-			log.Println(err, "Write Error")
-			UserOnline.Conn.Close()
-			return
 		}
 		oum.UserCntReport()
 	}

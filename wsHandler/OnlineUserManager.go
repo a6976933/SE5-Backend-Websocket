@@ -186,7 +186,7 @@ func (ou *OnlineUser) TestConnection() {
 		select {
 		case <-ou.Tick.C:
 			ou.Conn.SetWriteDeadline(time.Now().Add(WRITE_DEADLINE * time.Second))
-			msg := []byte(`{"res": "Fuck"}`)
+			msg := []byte(`{"header":"ping","ping": "ping"}`)
 			err := ou.Conn.WriteMessage(websocket.TextMessage, msg)
 			if err != nil {
 				log.Println(err, "Can't write user")

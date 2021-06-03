@@ -13,8 +13,8 @@ const (
 	HISTORY_MSG_NUM = 60
 	LOAD_NUM        = 50
 	MSG_SAVE_SIZE   = 70
-	SAVE_TIME       = 120
-	NOONE_TIME      = 180
+	SAVE_TIME       = 10
+	NOONE_TIME      = 20
 )
 
 type Msg interface {
@@ -105,6 +105,14 @@ func (mq *MsgQueue) FetchAll() []Msg {
 	return ret
 }
 
+func (mq *MsgQueue) Reverse() {
+	q := make([]Msg, 0)
+	for i := len(mq.queue) - 1; i >= 0; i-- {
+		q = append(q, mq.queue[i])
+	}
+	mq.queue = q
+}
+
 func (mq *MsgQueue) RefreshHead() {
 	mq.queue = mq.queue[1:]
 }
@@ -182,6 +190,7 @@ func (rmm *RoomMsgManager) LoadInitInfo(db *gorm.DB) error {
 		}
 		rmm.historyMsgQueue.Push(loadMsg)
 	}
+	rmm.historyMsgQueue.Reverse()
 	return nil
 }
 
@@ -205,6 +214,9 @@ func (rmm *RoomMsgManager) SaveMsg2DBByTicker(db *gorm.DB) {
 }
 
 func (rmm *RoomMsgManager) SaveMsg2DB(db *gorm.DB) error {
+	if len(rmm.MessageSaveQueue) == 0 {
+		return nil
+	}
 	result := db.Create(&rmm.MessageSaveQueue)
 	if result.Error != nil {
 		log.Println(result.Error)
@@ -228,7 +240,7 @@ func (rmm *RoomMsgManager) Run(db *gorm.DB) {
 			if message.GetMsgType() == "text" {
 				var tmpMsg = Room_Roommessage{RoomID: message.GetRoomID(), MemberID: message.GetUserID(), Message: message.GetTextMsg(), RecvTime: message.GetTime()}
 				rmm.MessageSaveQueue = append(rmm.MessageSaveQueue, tmpMsg)
-				log.Println(rmm.MessageSaveQueue)
+				log.Println(rmm.MessageSaveQueue, "Message Queue")
 			}
 			rmm.SaveMsg2DBByNumber(db)
 
@@ -248,20 +260,19 @@ func (rmm *RoomMsgManager) Run(db *gorm.DB) {
 			rmm.OnlineMemberList[member.userID] = member.user
 		case memberID := <-rmm.unregister:
 			if _, ok := rmm.OnlineMemberList[memberID]; ok {
-				log.Println(memberID, " Unregister")
+				log.Println(memberID, "in room", rmm.ID, " is unregister")
 				rmm.NobodyTicker = time.NewTicker(NOONE_TIME * time.Second)
 				close(rmm.OnlineMemberList[memberID].broadTextMsg)
 				delete(rmm.OnlineMemberList, memberID)
 			}
 		case <-rmm.SaveMsgTicker.C:
 			rmm.SaveMsg2DBByTicker(db)
+			rmm.SaveMsgTicker = time.NewTicker(SAVE_TIME * time.Second)
 		case <-rmm.NobodyTicker.C:
 			if len(rmm.OnlineMemberList) == 0 {
 				rmm.SaveMsg2DB(db)
 				rmm.Manager.CloseRoom(rmm.ID)
 				return
-			} else {
-				rmm.NobodyTicker = time.NewTicker(NOONE_TIME * time.Second)
 			}
 		}
 	}
