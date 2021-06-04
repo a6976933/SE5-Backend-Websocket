@@ -40,7 +40,7 @@ type WsHandler struct {
 	Conn         *websocket.Conn
 	Room         *RoomMsgManager
 	broadTextMsg chan Msg
-	Username     string
+	Nickname     string
 	UserID       int
 }
 
@@ -65,7 +65,7 @@ type RecvMsg struct {
 type WriteMsg struct {
 	Header     string    `json:"header"`
 	UserID     int       `json:"userID"`
-	Username   string    `json:"username"`
+	Nickname   string    `json:"nickname"`
 	MsgType    string    `json:"msg_type"`
 	RoomName   string    `json:"room_name"`
 	RoomID     int       `json:"roomID"`
@@ -112,7 +112,7 @@ func (wsh *WsHandler) FetchMessage() bool {
 			err := wsh.Conn.WriteMessage(websocket.TextMessage, sendMsg)
 			if err != nil {
 				wsh.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-				log.Println("Write history message to member ", wsh.Username, " False")
+				log.Println("Write history message to member ", wsh.Nickname, " False")
 				return false
 			}
 		}
@@ -165,7 +165,7 @@ func (wsh *WsHandler) ReadPump() {
 			if recvMessage.MsgType == "text" {
 				textMessage.userID = recvMessage.UserID
 				textMessage.roomID = recvMessage.RoomID
-				//textMessage.username = recvMessage.Username
+				textMessage.username = wsh.Nickname
 				textMessage.word = recvMessage.Message
 				textMessage.messageType = "text"
 				textMessage.recTime = time.Now()
@@ -189,16 +189,15 @@ func (wsh *WsHandler) WritePump() {
 				wsh.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			if message.GetMsgType() == "text" {
-				wMsg := wsh.SetWriteMsg(message)
-				sendMsg, _ := json.Marshal(wMsg)
-				log.Println("Send JSON to client: ", string(sendMsg))
-				err := wsh.Conn.WriteMessage(websocket.TextMessage, sendMsg)
-				if err != nil {
-					wsh.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-					return
-				}
+			wMsg := wsh.SetWriteMsg(message)
+			sendMsg, _ := json.Marshal(wMsg)
+			log.Println("Send JSON to client: ", string(sendMsg))
+			err := wsh.Conn.WriteMessage(websocket.TextMessage, sendMsg)
+			if err != nil {
+				wsh.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
 			}
+
 		case <-ticker.C:
 			wsh.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			msg := []byte(`{"header":"ping","ping": "ping"}`)
@@ -216,10 +215,16 @@ func (wsh *WsHandler) SetWriteMsg(message Msg) WriteMsg {
 		wMsg.Message = message.GetTextMsg()
 		wMsg.MsgType = message.GetMsgType()
 		wMsg.UserID = message.GetUserID()
-		wMsg.Username = message.GetUsername()
+		wMsg.Nickname = message.GetUsername()
 		wMsg.RoomID = message.GetRoomID()
 		wMsg.MsgTime = message.GetTime()
 		wMsg.Header = "message"
+	} else if message.GetMsgType() == "update" {
+		wMsg.Message = message.GetTextMsg()
+		wMsg.MsgType = message.GetMsgType()
+		wMsg.RoomID = message.GetRoomID()
+		wMsg.MsgTime = message.GetTime()
+		wMsg.Header = message.GetMsgHeader()
 	}
 	return wMsg
 }

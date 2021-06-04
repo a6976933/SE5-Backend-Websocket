@@ -124,6 +124,7 @@ func RoomConnectHandler(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc 
 
 		wsH.UserID = initInfo.UserID
 		wsH.Room = servingRoom
+		wsH.Nickname = servingRoom.UsernameMap[initInfo.UserID]
 		wsH.Register()
 		wsH.FetchMessage()
 		go wsH.ReadPump()
@@ -243,9 +244,10 @@ func RoomMemberRemoveHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.Roo
 		}
 		rmMessage := &wsHandler.RemoveMsg{}
 		err = c.BindJSON(&rmMessage)
+		log.Println(rmMessage)
 		if err != nil {
 			log.Println(err)
-			c.JSON(http.StatusBadRequest, gin.H{
+			c.JSON(http.StatusInternalServerError, gin.H{
 				"detail": "Your JSON data format is wrong",
 			})
 		}
@@ -257,9 +259,20 @@ func RoomMemberRemoveHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.Roo
 			})
 			return
 		}
+		if !rm.IsRoomExist(roomID) {
+			c.JSON(http.StatusOK, gin.H{
+				"detail": "Successful remove user but room isn't online",
+			})
+			return
+		}
 		modifiedRoom := rm.LiveRoomList[roomID]
 		if modifiedRoom.IsMemberInRoom(rmMessage.RemovedUserID) {
-			modifiedRoom.OnlineMemberList[rmMessage.RemovedUserID].Unregister()
+			if modifiedRoom.IsMemeberOnline(rmMessage.RemovedUserID) {
+				modifiedRoom.OnlineMemberList[rmMessage.RemovedUserID].Unregister()
+			} else {
+				log.Println("User ", rmMessage.RemovedUserID, "isn't online")
+			}
+			delete(modifiedRoom.UsernameMap, rmMessage.RemovedUserID)
 			delete(modifiedRoom.AccessLevelMap, rmMessage.RemovedUserID)
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -282,7 +295,7 @@ func RoomMemberJoinHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomM
 		err = c.BindJSON(&joinMessage)
 		if err != nil {
 			log.Println(err)
-			c.JSON(http.StatusBadRequest, gin.H{
+			c.JSON(http.StatusInternalServerError, gin.H{
 				"detail": "Your JSON data format is wrong",
 			})
 		}
@@ -294,9 +307,24 @@ func RoomMemberJoinHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomM
 			})
 			return
 		}
+		if !rm.IsRoomExist(roomID) {
+			c.JSON(http.StatusOK, gin.H{
+				"detail": "Successful join user but room isn't online",
+			})
+			return
+		}
 		modifiedRoom := rm.LiveRoomList[roomID]
 		if !modifiedRoom.IsMemberInRoom(joinMessage.JoinUserID) {
+			var joinUser wsHandler.RoomRoommember
+			result := db.Where("member_id = ?", joinMessage.JoinUserID).Find(&joinUser)
+			if result.Error != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"detail": "Finding DB Error",
+				})
+			}
+			modifiedRoom.UsernameMap[joinMessage.JoinUserID] = joinUser.Nickname
 			modifiedRoom.AccessLevelMap[joinMessage.JoinUserID] = "user"
+			log.Println(modifiedRoom.UsernameMap[joinMessage.JoinUserID])
 		}
 		c.JSON(http.StatusOK, gin.H{
 			"detail": "Successful join user from room",
@@ -318,11 +346,17 @@ func RoomUpdateHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManag
 		err = c.BindJSON(&updateMessage)
 		if err != nil {
 			log.Println(err)
-			c.JSON(http.StatusBadRequest, gin.H{
+			c.JSON(http.StatusInternalServerError, gin.H{
 				"detail": "Your JSON data format is wrong",
 			})
 		}
 		roomID, err = strconv.Atoi(c.Param("id"))
+		if !rm.IsRoomExist(roomID) {
+			c.JSON(http.StatusOK, gin.H{
+				"detail": "Successful broadcast but room isn't online",
+			})
+			return
+		}
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -335,6 +369,7 @@ func RoomUpdateHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManag
 			"detail": "Successful update",
 		})
 		log.Println(modifiedRoom.ID)
+		rm.LiveRoomList[modifiedRoom.ID].SendBroadcastUpdate(updateMessage.UpdateData, modifiedRoom.ID)
 	}
 	return gin.HandlerFunc(fn)
 }
@@ -351,7 +386,7 @@ func BackendUserNotifyHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) gin
 		err = c.BindJSON(&userNotify)
 		if err != nil {
 			log.Println(err)
-			c.JSON(http.StatusBadRequest, gin.H{
+			c.JSON(http.StatusInternalServerError, gin.H{
 				"detail": "Your JSON data format is wrong",
 			})
 		}

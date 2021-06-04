@@ -11,6 +11,7 @@ type Room_Roommessage struct {
 	MemberID int
 	Message  string
 	RecvTime time.Time
+	Nickname string
 }
 
 type UserCustomuser struct {

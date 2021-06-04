@@ -66,6 +66,7 @@ func (oum *OnlineUserManager) Run() {
 			go func(user *OnlineUser, msg UserNotificationMsg) {
 				ticker := time.NewTicker(pingPeriod)
 				defer ticker.Stop()
+				msg.NotifyString = "notify"
 				marshMsg, _ := json.Marshal(msg)
 				err := user.Conn.WriteMessage(websocket.TextMessage, marshMsg)
 				if err != nil {

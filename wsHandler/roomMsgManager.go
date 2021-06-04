@@ -24,6 +24,7 @@ type Msg interface {
 	GetRoomID() int
 	GetMsgType() string
 	GetTextMsg() string
+	GetMsgHeader() string
 	//GetJPGMsg()
 }
 
@@ -34,6 +35,7 @@ type TextMsg struct {
 	userID      int
 	roomID      int
 	word        string
+	header      string
 }
 
 func (tm TextMsg) GetTime() time.Time {
@@ -60,6 +62,10 @@ func (tm TextMsg) GetTextMsg() string {
 	return tm.word
 }
 
+func (tm TextMsg) GetMsgHeader() string {
+	return tm.header
+}
+
 type MsgQueue struct {
 	queue []Msg
 }
@@ -83,12 +89,13 @@ func (mq *MsgQueue) IsEmpty() bool {
 }
 
 func (mq *MsgQueue) Push(msg Msg) bool {
-	if len(mq.queue) < HISTORY_MSG_NUM {
-		mq.queue = append(mq.queue, msg)
-		return true
-	} else {
-		return false
-	}
+	//if len(mq.queue) < HISTORY_MSG_NUM {
+	mq.queue = append(mq.queue, msg)
+	return true
+	/*
+		} else {
+			return false
+		}*/
 }
 
 func (mq *MsgQueue) PopHead() Msg {
@@ -131,6 +138,7 @@ type RoomMsgManager struct {
 	message          chan Msg
 	RoomInfo         *RoomRoom
 	MessageSaveQueue []Room_Roommessage
+	RoomMemberDetail []UserCustomuser
 	SaveMsgTicker    *time.Ticker
 	NobodyTicker     *time.Ticker
 }
@@ -173,17 +181,27 @@ func (rmm *RoomMsgManager) LoadInitInfo(db *gorm.DB) error {
 	}
 	rmm.RoomInfo.RoomMemberList = nil
 	rmm.Name = rmm.RoomInfo.Title
-	result.Error = db.Model(&rmm.RoomInfo).Order("id desc").Limit(LOAD_NUM).Association("RoomMessageList").Find(&rmm.RoomInfo.RoomMessageList)
+	result.Error = db.Model(&rmm.RoomInfo).Order("id desc").Association("RoomMessageList").Find(&rmm.RoomInfo.RoomMessageList) //Limit(LOAD_NUM)
 
 	if result.Error != nil {
 		log.Println(result.Error)
 		return result.Error
 	}
 	for i := 0; i < len(rmm.RoomInfo.RoomMessageList); i++ {
+		var nickname = rmm.UsernameMap[rmm.RoomInfo.RoomMessageList[i].MemberID]
+		if _, ok := rmm.UsernameMap[rmm.RoomInfo.RoomMessageList[i].MemberID]; !ok {
+			var notInRoomUser UserCustomuser
+			result := db.Where("id = ?", rmm.RoomInfo.RoomMessageList[i].MemberID).Find(&notInRoomUser)
+			if result.Error != nil {
+				log.Println(result.Error, "Find not in room user error")
+				continue
+			}
+			nickname = notInRoomUser.Nickname
+		}
 		loadMsg := TextMsg{
 			recTime:     rmm.RoomInfo.RoomMessageList[i].RecvTime,
 			messageType: "text",
-			username:    rmm.UsernameMap[rmm.RoomInfo.RoomMessageList[i].MemberID],
+			username:    nickname,
 			userID:      rmm.RoomInfo.RoomMessageList[i].MemberID,
 			roomID:      rmm.ID,
 			word:        rmm.RoomInfo.RoomMessageList[i].Message,
@@ -195,7 +213,15 @@ func (rmm *RoomMsgManager) LoadInitInfo(db *gorm.DB) error {
 }
 
 func (rmm *RoomMsgManager) IsMemberInRoom(userID int) bool {
-	if _, ok := rmm.AccessLevelMap[userID]; ok {
+	if _, ok := rmm.UsernameMap[userID]; ok {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (rmm *RoomMsgManager) IsMemeberOnline(userID int) bool {
+	if _, ok := rmm.OnlineMemberList[userID]; ok {
 		return true
 	} else {
 		return false
@@ -227,6 +253,16 @@ func (rmm *RoomMsgManager) SaveMsg2DB(db *gorm.DB) error {
 	return nil
 }
 
+func (rmm *RoomMsgManager) SendBroadcastUpdate(updateStr string, roomID int) {
+	var msg TextMsg
+	msg.header = "update"
+	msg.word = updateStr
+	msg.recTime = time.Now()
+	msg.messageType = "update"
+	msg.roomID = roomID
+	rmm.broadcast <- msg
+}
+
 func (rmm *RoomMsgManager) Run(db *gorm.DB) {
 	for {
 		select {
@@ -246,17 +282,17 @@ func (rmm *RoomMsgManager) Run(db *gorm.DB) {
 
 			for key, member := range rmm.OnlineMemberList {
 				log.Println("UserID: ", key)
-				log.Println("Member :", member.Username)
+				log.Println("Member :", member.Nickname)
 				select {
 				case member.broadTextMsg <- message:
-					log.Println("Send ", message.GetTextMsg(), " To ", member.Username)
+					log.Println("Send ", message.GetTextMsg(), " To ", member.Nickname)
 				default:
 					close(member.broadTextMsg)
 					delete(rmm.OnlineMemberList, key)
 				}
 			}
 		case member := <-rmm.register:
-			log.Println(member.user.Username, " Register")
+			log.Println(member.user.Nickname, " Register")
 			rmm.OnlineMemberList[member.userID] = member.user
 		case memberID := <-rmm.unregister:
 			if _, ok := rmm.OnlineMemberList[memberID]; ok {
