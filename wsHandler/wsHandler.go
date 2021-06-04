@@ -127,6 +127,10 @@ func (wsh *WsHandler) Register() {
 	wsh.Room.register <- regInfo
 }
 
+func (wsh *WsHandler) Unregister() {
+	wsh.Room.unregister <- wsh.UserID
+}
+
 func (wsh *WsHandler) ReadPump() {
 	defer func() {
 		wsh.Conn.Close()

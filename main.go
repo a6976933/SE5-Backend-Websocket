@@ -11,6 +11,8 @@ import (
 
 	//"strconv"
 	//"time"
+	"fmt"
+
 	"gorm.io/driver/sqlite"
 )
 
@@ -25,7 +27,10 @@ func initDatabase(dsn string) (*gorm.DB, error) {
 
 func main() {
 	const addr = "127.0.0.1:8090"
-	const dsn = "/Users/allenwang/se5-back/db.sqlite3"
+
+	var dsn string //"/Users/allenwang/se5-back/db.sqlite3"
+	fmt.Println("input DSN(Sqlite location)")
+	fmt.Scanln(&dsn)
 	db, err := initDatabase(dsn)
 	if err != nil {
 		return

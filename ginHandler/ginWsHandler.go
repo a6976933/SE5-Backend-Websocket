@@ -38,6 +38,7 @@ func RoomConnectHandler(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc 
 		var err error
 		var servingRoom *wsHandler.RoomMsgManager
 		var initInfo = new(wsHandler.RoomRequestConnectionMsg)
+		var roomExist = false
 		wsH := wsHandler.NewWsHandler()
 		if roomID, err = strconv.Atoi(c.Param("roomID")); err != nil {
 			log.Println(err)
@@ -63,13 +64,10 @@ func RoomConnectHandler(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc 
 			}
 			servingRoom.ID = roomID
 			servingRoom.RoomInfo = &wsHandler.RoomRoom{}
-			err = servingRoom.LoadInitInfo(db)
-			if err != nil {
-				return
-			}
 		} else {
 			servingRoom = rm.LiveRoomList[roomID]
 			servingRoom.ID = roomID
+			roomExist = true
 		}
 		go servingRoom.Run(db) //
 		err = wsH.InitWebsocketConn(c)
@@ -91,22 +89,37 @@ func RoomConnectHandler(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc 
 		if err != nil {
 			log.Println(err)
 			return
-		} else {
-			//log.Println("Has got the user information, \n name: ", initInfo.Username)
 		}
-
-		if _, ok := servingRoom.UsernameMap[initInfo.UserID]; !ok {
-			log.Println("The user " + strconv.Itoa(initInfo.UserID) + " is not in the room, Invalid Access!!!!!")
-			log.Println("So Close the Connection!!!")
-			wsH.Conn.Close()
-			return
-		}
-
 		isValid, JWTID := wsHandler.JWTAuthentication(initInfo.Token)
 		if !isValid || JWTID != initInfo.UserID {
 			wsH.Conn.Close()
 			log.Println("Token Invalid!!!")
 			return
+		}
+		if roomExist {
+			if _, ok := servingRoom.UsernameMap[initInfo.UserID]; !ok {
+				log.Println("The user " + strconv.Itoa(initInfo.UserID) + " is not in the room, Invalid Access!!!!!")
+				log.Println("So Close the Connection!!!")
+				wsH.Conn.Close()
+				return
+			}
+		} else {
+			cnt := int64(0)
+			result := db.Model(&wsHandler.RoomRoommember{}).Where("member_id = ? AND room_id = ?", initInfo.UserID, roomID).Count(&cnt)
+			if cnt != 1 {
+				log.Println("The user " + strconv.Itoa(initInfo.UserID) + " is not in the room, Invalid Access!!!!!")
+				log.Println("So Close the Connection!!!")
+				wsH.Conn.Close()
+			}
+			if result.Error != nil {
+				log.Println(err)
+				return
+			}
+			err = servingRoom.LoadInitInfo(db)
+			if err != nil {
+				log.Println(err)
+				return
+			}
 		}
 
 		wsH.UserID = initInfo.UserID
@@ -246,6 +259,7 @@ func RoomMemberRemoveHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.Roo
 		}
 		modifiedRoom := rm.LiveRoomList[roomID]
 		if modifiedRoom.IsMemberInRoom(rmMessage.RemovedUserID) {
+			modifiedRoom.OnlineMemberList[rmMessage.RemovedUserID].Unregister()
 			delete(modifiedRoom.AccessLevelMap, rmMessage.RemovedUserID)
 		}
 		c.JSON(http.StatusOK, gin.H{
