@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	OFFLINE_TIME   = 12
+	OFFLINE_TIME   = 100
 	WRITE_DEADLINE = 10
 )
 
@@ -34,6 +34,7 @@ type UpdateMsg struct {
 }
 
 type UserNotificationMsg struct {
+	Header         string `json:"header"`
 	NotifyType     string `json:"notify_type"`
 	NotifyString   string `json:"notify_string"`
 	DoNotifyUserID int    `json:"notify_userID"`
@@ -63,17 +64,29 @@ func (oum *OnlineUserManager) Run() {
 		select {
 		case message := <-oum.Notify:
 			user := oum.OnlineUserList[message.NotifyUserID]
-			go func(user *OnlineUser, msg UserNotificationMsg) {
-				ticker := time.NewTicker(pingPeriod)
-				defer ticker.Stop()
-				msg.NotifyString = "notify"
-				marshMsg, _ := json.Marshal(msg)
-				err := user.Conn.WriteMessage(websocket.TextMessage, marshMsg)
-				if err != nil {
-					user.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-					user.Conn.Close()
-				}
-			}(user, message)
+			msg := message
+			ticker := time.NewTicker(pingPeriod)
+			defer ticker.Stop()
+			msg.NotifyString = "notify"
+			msg.Header = "notify"
+			marshMsg, err := json.Marshal(msg)
+			log.Println(msg)
+			if err != nil {
+				log.Println(err)
+			}
+			err = user.Conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+			if err != nil {
+				log.Println(err)
+				user.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				user.Conn.Close()
+			}
+			log.Println(user)
+			err = user.Conn.WriteMessage(websocket.TextMessage, marshMsg)
+			if err != nil {
+				log.Println(err)
+				user.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				user.Conn.Close()
+			}
 		case userID := <-oum.unregister:
 			if _, ok := oum.OnlineUserList[userID]; ok {
 				log.Println("User ", userID, " Leave!")
@@ -186,7 +199,7 @@ func (ou *OnlineUser) TestConnection() {
 	for {
 		select {
 		case <-ou.Tick.C:
-			ou.Conn.SetWriteDeadline(time.Now().Add(WRITE_DEADLINE * time.Second))
+			//ou.Conn.SetWriteDeadline(time.Now().Add(WRITE_DEADLINE * time.Second))
 			msg := []byte(`{"header":"ping","ping": "ping"}`)
 			err := ou.Conn.WriteMessage(websocket.TextMessage, msg)
 			if err != nil {
