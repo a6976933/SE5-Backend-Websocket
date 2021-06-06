@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	OFFLINE_TIME   = 100
-	WRITE_DEADLINE = 10
+	OFFLINE_TIME   = 10
+	WRITE_DEADLINE = 3
 )
 
 type RemoveMsg struct {
@@ -203,7 +203,7 @@ func (ou *OnlineUser) TestConnection() {
 			msg := []byte(`{"header":"ping","ping": "ping"}`)
 			err := ou.Conn.WriteMessage(websocket.TextMessage, msg)
 			if err != nil {
-				log.Println(err, "Can't write user")
+				log.Println(err, " User timeout, so close connection")
 				ou.Unregister()
 				return
 			} else {

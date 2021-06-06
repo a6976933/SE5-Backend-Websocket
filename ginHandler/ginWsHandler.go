@@ -157,7 +157,7 @@ func UserNotifyConnectionHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) 
 				return
 			}
 			if count != 1 {
-				log.Println("Query User Error, Has two User")
+				log.Println("Query User Error")
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"detail": "Query User Error",
 				})
@@ -186,7 +186,7 @@ func UserNotifyConnectionHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) 
 			})
 			return
 		} else {
-			log.Println("User ID connect: ", UserOnline.ID)
+			//log.Println("User ID connect: ", UserOnline.ID)
 		}
 		_, message, err := UserOnline.Conn.ReadMessage()
 		if err != nil {
@@ -324,7 +324,7 @@ func RoomMemberJoinHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomM
 			}
 			modifiedRoom.UsernameMap[joinMessage.JoinUserID] = joinUser.Nickname
 			modifiedRoom.AccessLevelMap[joinMessage.JoinUserID] = "user"
-			log.Println(modifiedRoom.UsernameMap[joinMessage.JoinUserID])
+			//log.Println(modifiedRoom.UsernameMap[joinMessage.JoinUserID])
 		}
 		c.JSON(http.StatusOK, gin.H{
 			"detail": "Successful join user from room",
@@ -368,7 +368,7 @@ func RoomUpdateHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManag
 		c.JSON(http.StatusOK, gin.H{
 			"detail": "Successful update",
 		})
-		log.Println(modifiedRoom.ID)
+		//log.Println(modifiedRoom.ID)
 		rm.LiveRoomList[modifiedRoom.ID].SendBroadcastUpdate(updateMessage.UpdateData, modifiedRoom.ID)
 	}
 	return gin.HandlerFunc(fn)

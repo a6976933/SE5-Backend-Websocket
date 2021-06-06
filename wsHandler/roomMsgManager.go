@@ -230,12 +230,22 @@ func (rmm *RoomMsgManager) IsMemeberOnline(userID int) bool {
 
 func (rmm *RoomMsgManager) SaveMsg2DBByNumber(db *gorm.DB) {
 	if len(rmm.MessageSaveQueue) >= 70 {
-		rmm.SaveMsg2DB(db)
+		err := rmm.SaveMsg2DB(db)
+		if err != nil {
+			log.Println("Saving Room", rmm.ID, " Error when message exceed limit")
+		} else {
+			log.Println("Save Room ", rmm.ID, " Success when message exceed limit")
+		}
 	}
 }
 
 func (rmm *RoomMsgManager) SaveMsg2DBByTicker(db *gorm.DB) {
-	rmm.SaveMsg2DB(db)
+	err := rmm.SaveMsg2DB(db)
+	if err != nil {
+		log.Println("Saving Room", rmm.ID, " Error when time trigger")
+	} else {
+		log.Println("Save Room ", rmm.ID, " Success when time trigger")
+	}
 	rmm.SaveMsgTicker = time.NewTicker(SAVE_TIME * time.Second)
 }
 
@@ -267,7 +277,6 @@ func (rmm *RoomMsgManager) Run(db *gorm.DB) {
 	for {
 		select {
 		case message := <-rmm.broadcast:
-			log.Println("Got Broadcast ", message.GetTextMsg())
 			log.Println("Now Online List", len(rmm.OnlineMemberList))
 			if !rmm.historyMsgQueue.Push(message) {
 				rmm.historyMsgQueue.RefreshHead()
@@ -292,11 +301,11 @@ func (rmm *RoomMsgManager) Run(db *gorm.DB) {
 				}
 			}
 		case member := <-rmm.register:
-			log.Println(member.user.Nickname, " Register")
+			log.Println(member.user.Nickname, " Register Room ", rmm.ID)
 			rmm.OnlineMemberList[member.userID] = member.user
 		case memberID := <-rmm.unregister:
 			if _, ok := rmm.OnlineMemberList[memberID]; ok {
-				log.Println(memberID, "in room", rmm.ID, " is unregister")
+				log.Println(memberID, " in room ", rmm.ID, " is unregister")
 				rmm.NobodyTicker = time.NewTicker(NOONE_TIME * time.Second)
 				close(rmm.OnlineMemberList[memberID].broadTextMsg)
 				delete(rmm.OnlineMemberList, memberID)

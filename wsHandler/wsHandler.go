@@ -112,7 +112,7 @@ func (wsh *WsHandler) FetchMessage() bool {
 			err := wsh.Conn.WriteMessage(websocket.TextMessage, sendMsg)
 			if err != nil {
 				wsh.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-				log.Println("Write history message to member ", wsh.Nickname, " False")
+				log.Println("Write history message to member ", wsh.UserID, " got error, so close the connection")
 				return false
 			}
 		}
