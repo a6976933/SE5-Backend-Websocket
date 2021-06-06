@@ -285,7 +285,7 @@ func (rmm *RoomMsgManager) Run(db *gorm.DB) {
 			if message.GetMsgType() == "text" {
 				var tmpMsg = Room_Roommessage{RoomID: message.GetRoomID(), MemberID: message.GetUserID(), Message: message.GetTextMsg(), RecvTime: message.GetTime()}
 				rmm.MessageSaveQueue = append(rmm.MessageSaveQueue, tmpMsg)
-				log.Println(rmm.MessageSaveQueue, "Message Queue")
+				//log.Println(rmm.MessageSaveQueue, "Message Queue")
 			}
 			rmm.SaveMsg2DBByNumber(db)
 

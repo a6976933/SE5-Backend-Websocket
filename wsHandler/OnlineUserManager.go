@@ -194,12 +194,12 @@ func (ou *OnlineUser) InitWebsocketConn(c *gin.Context) error {
 
 func (ou *OnlineUser) TestConnection() {
 	ou.Tick = time.NewTicker(OFFLINE_TIME * time.Second)
-	//ou.Conn.SetWriteDeadline(time.Now().Add(WRITE_DEADLINE * time.Second))
+	ou.Conn.SetWriteDeadline(time.Now().Add(WRITE_DEADLINE * time.Second))
 	defer ou.Conn.Close()
 	for {
 		select {
 		case <-ou.Tick.C:
-			//ou.Conn.SetWriteDeadline(time.Now().Add(WRITE_DEADLINE * time.Second))
+			ou.Conn.SetWriteDeadline(time.Now().Add(WRITE_DEADLINE * time.Second))
 			msg := []byte(`{"header":"ping","ping": "ping"}`)
 			err := ou.Conn.WriteMessage(websocket.TextMessage, msg)
 			if err != nil {
