@@ -11,13 +11,12 @@ import (
 
 	//"strconv"
 	//"time"
-	"fmt"
 
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 )
 
 func initDatabase(dsn string) (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -27,10 +26,12 @@ func initDatabase(dsn string) (*gorm.DB, error) {
 
 func main() {
 	const addr = "127.0.0.1:8090"
+	gin.SetMode(gin.ReleaseMode)
 
 	var dsn string //"/Users/allenwang/se5-back/db.sqlite3"
-	fmt.Println("input DSN(Sqlite location)")
-	fmt.Scanln(&dsn)
+	dsn = "host=ec2-3-218-71-191.compute-1.amazonaws.com user=ktpcfcntkcpxwi password=71db68e37c141279bb86464e2df66f83e184b5f28c8911f2da498c6fb0aa482d dbname=d1ictoavo8addi port=5432 sslmode=require"
+	//fmt.Println("input DSN(Sqlite location)")
+	//fmt.Scanln(&dsn)
 	db, err := initDatabase(dsn)
 	if err != nil {
 		return
@@ -40,17 +41,17 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
-	log.Println(messageID)
 	/*
-	  for i := 1; i < 10 ; i++ {
-	    test := wsHandler.Room_Roommessage{RoomID:1,MemberID:6,Message:"上課囉AAAAAAAAA"+strconv.Itoa(i),RecvTime:time.Now()}
-	    //messageID += 1
-	    result := db.Create(&test)
-	    if result.Error != nil {
-	      log.Println(result.Error)
-	      return
-	    }
-	  }*/
+		log.Println(messageID)
+		for i := 1; i < 10; i++ {
+			test := wsHandler.Room_Roommessage{RoomID: 4, MemberID: 2, Message: "上課囉AAAAAA" + strconv.Itoa(i), RecvTime: time.Now(), Nickname: "allen"}
+			//messageID += 1
+			result := db.Create(&test)
+			if result.Error != nil {
+				log.Println(result.Error)
+				return
+			}
+		}*/
 	roomManager := wsHandler.NewRoomManager()
 	userManager := wsHandler.NewOnlineUserManager()
 	go userManager.Run()
@@ -75,6 +76,6 @@ func main() {
 		UserNotify.GET("/:id", ginHandler.UserNotifyConnectionHandler(userManager, db))
 	}
 
-	router.Run(addr)
+	router.Run()
 
 }

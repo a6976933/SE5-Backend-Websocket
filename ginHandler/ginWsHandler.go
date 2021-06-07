@@ -238,12 +238,8 @@ func checkIP(c *gin.Context) error {
 func RoomMemberRemoveHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		var roomID int
-		err := checkIP(c)
-		if err != nil {
-			return
-		}
 		rmMessage := &wsHandler.RemoveMsg{}
-		err = c.BindJSON(&rmMessage)
+		err := c.BindJSON(&rmMessage)
 		log.Println(rmMessage)
 		if err != nil {
 			log.Println(err)
@@ -287,12 +283,8 @@ func RoomMemberRemoveHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.Roo
 func RoomMemberJoinHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		var roomID int
-		err := checkIP(c)
-		if err != nil {
-			return
-		}
 		joinMessage := &wsHandler.JoinMsg{}
-		err = c.BindJSON(&joinMessage)
+		err := c.BindJSON(&joinMessage)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -338,12 +330,8 @@ func RoomMemberJoinHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomM
 func RoomUpdateHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		var roomID int
-		err := checkIP(c)
-		if err != nil {
-			return
-		}
 		updateMessage := &wsHandler.UpdateMsg{}
-		err = c.BindJSON(&updateMessage)
+		err := c.BindJSON(&updateMessage)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -378,12 +366,8 @@ func BackendUserNotifyHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) gin
 	fn := func(c *gin.Context) {
 		var userID int
 		//var user *wsHandler.OnlineUser
-		err := checkIP(c)
-		if err != nil {
-			return
-		}
 		userNotify := &wsHandler.UserNotificationMsg{}
-		err = c.BindJSON(&userNotify)
+		err := c.BindJSON(&userNotify)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{

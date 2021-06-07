@@ -16,6 +16,7 @@ require (
 	github.com/walle/lll v1.0.1 // indirect
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/sys v0.0.0-20210525143221-35b2ab0089ea // indirect
+	gorm.io/driver/postgres v1.1.0
 	gorm.io/driver/sqlite v1.1.4
 	gorm.io/gorm v1.21.10
 	mvdan.cc/unparam v0.0.0-20210520122750-2ac67f130a88 // indirect
