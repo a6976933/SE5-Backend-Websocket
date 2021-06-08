@@ -135,6 +135,7 @@ func RoomConnectHandler(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc 
 
 		wsH.UserID = initInfo.UserID
 		wsH.Room = servingRoom
+		wsH.RoomID = servingRoom.ID
 		wsH.Nickname = servingRoom.UsernameMap[initInfo.UserID]
 		wsH.Register()
 		wsH.FetchMessage()

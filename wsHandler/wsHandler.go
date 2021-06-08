@@ -42,6 +42,7 @@ type WsHandler struct {
 	broadTextMsg chan Msg
 	Nickname     string
 	UserID       int
+	RoomID       int
 }
 
 type RoomRequestConnectionMsg struct {
@@ -164,7 +165,7 @@ func (wsh *WsHandler) ReadPump() {
 		if recvMessage.Header == "message" {
 			if recvMessage.MsgType == "text" {
 				textMessage.userID = recvMessage.UserID
-				textMessage.roomID = recvMessage.RoomID
+				textMessage.roomID = wsh.RoomID
 				textMessage.username = wsh.Nickname
 				textMessage.word = recvMessage.Message
 				textMessage.messageType = "text"
