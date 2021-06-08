@@ -98,23 +98,34 @@ func RoomConnectHandler(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc 
 		}
 		if roomExist {
 			if _, ok := servingRoom.UsernameMap[initInfo.UserID]; !ok {
-				log.Println("The user " + strconv.Itoa(initInfo.UserID) + " is not in the room, Invalid Access!!!!!")
-				log.Println("So Close the Connection!!!")
-				wsH.Conn.Close()
-				return
+				var notInListUser wsHandler.RoomRoommember
+				result := db.Where("room_id = ? AND member_id = ?", roomID, initInfo.UserID).First(&notInListUser)
+				if result.Error != nil {
+					log.Println("The user " + strconv.Itoa(initInfo.UserID) + " is not in the room, Invalid Access!!!!!")
+					log.Println("So Close the Connection!!!")
+					wsH.Conn.Close()
+					return
+				} else {
+					err = servingRoom.LoadInitInfo(db)
+					if err != nil {
+						log.Println(err)
+						return
+					}
+				}
 			}
 		} else {
-			cnt := int64(0)
-			result := db.Model(&wsHandler.RoomRoommember{}).Where("member_id = ? AND room_id = ?", initInfo.UserID, roomID).Count(&cnt)
-			if cnt != 1 {
-				log.Println("The user " + strconv.Itoa(initInfo.UserID) + " is not in the room, Invalid Access!!!!!")
-				log.Println("So Close the Connection!!!")
-				wsH.Conn.Close()
-			}
-			if result.Error != nil {
-				log.Println(err)
-				return
-			}
+			/*
+				cnt := int64(0)
+				result := db.Model(&wsHandler.RoomRoommember{}).Where("member_id = ? AND room_id = ?", initInfo.UserID, roomID).Count(&cnt)
+				if cnt != 1 {
+					log.Println("The user " + strconv.Itoa(initInfo.UserID) + " is not in the room, Invalid Access!!!!!")
+					log.Println("So Close the Connection!!!")
+					wsH.Conn.Close()
+				}
+				if result.Error != nil {
+					log.Println(err)
+					return
+				}*/
 			err = servingRoom.LoadInitInfo(db)
 			if err != nil {
 				log.Println(err)
@@ -238,13 +249,15 @@ func checkIP(c *gin.Context) error {
 func RoomMemberRemoveHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		var roomID int
+		var err error
 		rmMessage := &wsHandler.RemoveMsg{}
-		err := c.BindJSON(&rmMessage)
+		rmMessage.RemoveUserID, err = strconv.Atoi(c.PostForm("remove_userID"))
+		rmMessage.RemovedUserID, err = strconv.Atoi(c.PostForm("removed_userID"))
 		log.Println(rmMessage)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"detail": "Your JSON data format is wrong",
+				"detail": "Your form data format is wrong",
 			})
 		}
 		roomID, err = strconv.Atoi(c.Param("id"))
@@ -283,12 +296,13 @@ func RoomMemberRemoveHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.Roo
 func RoomMemberJoinHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		var roomID int
+		var err error
 		joinMessage := &wsHandler.JoinMsg{}
-		err := c.BindJSON(&joinMessage)
+		joinMessage.JoinUserID, err = strconv.Atoi(c.PostForm("join_userID"))
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"detail": "Your JSON data format is wrong",
+				"detail": "Your form data format is wrong",
 			})
 		}
 		roomID, err = strconv.Atoi(c.Param("id"))
@@ -330,8 +344,9 @@ func RoomMemberJoinHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomM
 func RoomUpdateHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		var roomID int
+		var err error
 		updateMessage := &wsHandler.UpdateMsg{}
-		err := c.BindJSON(&updateMessage)
+		updateMessage.UpdateData = c.PostForm("update_data")
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -365,15 +380,17 @@ func RoomUpdateHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManag
 func BackendUserNotifyHandler(oum *wsHandler.OnlineUserManager, db *gorm.DB) gin.HandlerFunc {
 	fn := func(c *gin.Context) {
 		var userID int
+		var err error
 		//var user *wsHandler.OnlineUser
 		userNotify := &wsHandler.UserNotificationMsg{}
-		err := c.BindJSON(&userNotify)
-		if err != nil {
-			log.Println(err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"detail": "Your JSON data format is wrong",
-			})
-		}
+		/*
+			err := c.BindJSON(&userNotify)
+			if err != nil {
+				log.Println(err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"detail": "Your JSON data format is wrong",
+				})
+			}*/
 		userID, err = strconv.Atoi(c.Param("id"))
 		if err != nil {
 			log.Println(err)

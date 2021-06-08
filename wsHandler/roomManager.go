@@ -24,6 +24,11 @@ func NewRoomManager() *RoomManager {
 	return instance
 }
 
+////form initDatabase
+///join WebSocket
+///update strings
+///notify 0
+
 func (rm *RoomManager) CreateRoom(roomID int) (*RoomMsgManager, error) {
 	newRoom := NewRoomMsgManager()
 	newRoom.Manager = rm

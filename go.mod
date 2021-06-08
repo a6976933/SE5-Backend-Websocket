@@ -8,9 +8,11 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.7.2
+	github.com/gordonklaus/ineffassign v0.0.0-20210522101830-0589229737b2 // indirect
 	github.com/gorilla/websocket v1.4.2
 	github.com/kisielk/errcheck v1.6.0 // indirect
 	github.com/mdempsky/unconvert v0.0.0-20200228143138-95ecdbfc0b5f // indirect
+	github.com/mibk/dupl v1.0.0 // indirect
 	github.com/opennota/check v0.0.0-20180911053232-0c771f5545ff // indirect
 	github.com/securego/gosec v0.0.0-20200401082031-e946c8c39989 // indirect
 	github.com/stripe/safesql v0.2.0 // indirect
