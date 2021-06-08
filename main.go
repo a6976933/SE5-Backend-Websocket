@@ -26,7 +26,7 @@ func initDatabase(dsn string) (*gorm.DB, error) {
 
 func main() {
 	const addr = "127.0.0.1:8090"
-	//gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.ReleaseMode)
 
 	var dsn string //"/Users/allenwang/se5-back/db.sqlite3"
 	dsn = "host=ec2-3-218-71-191.compute-1.amazonaws.com user=ktpcfcntkcpxwi password=71db68e37c141279bb86464e2df66f83e184b5f28c8911f2da498c6fb0aa482d dbname=d1ictoavo8addi port=5432 sslmode=require"
@@ -76,6 +76,6 @@ func main() {
 		UserNotify.GET("/:id", ginHandler.UserNotifyConnectionHandler(userManager, db))
 	}
 
-	router.Run(addr)
+	router.Run()
 
 }
