@@ -13,7 +13,7 @@ const (
 	HISTORY_MSG_NUM = 60
 	LOAD_NUM        = 50
 	MSG_SAVE_SIZE   = 70
-	SAVE_TIME       = 10
+	SAVE_TIME       = 60
 	NOONE_TIME      = 20
 )
 

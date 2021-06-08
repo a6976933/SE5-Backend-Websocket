@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	OFFLINE_TIME   = 10
+	OFFLINE_TIME   = 20
 	WRITE_DEADLINE = 3
 )
 

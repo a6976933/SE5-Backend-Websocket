@@ -78,7 +78,7 @@ const (
 	maxMsgReadSize = 2048
 	writeWait      = 1 * time.Second
 	pongWait       = 60 * time.Second
-	pingPeriod     = 5 //(pongWait * 9) / 10
+	pingPeriod     = 20 //(pongWait * 9) / 10
 )
 
 func (wsh *WsHandler) InitWebsocketConn(c *gin.Context) error {
