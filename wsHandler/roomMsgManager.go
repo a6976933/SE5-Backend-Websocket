@@ -325,12 +325,12 @@ func (rmm *RoomMsgManager) Run(db *gorm.DB) {
 			log.Println(member.user.Nickname, " Register Room ", rmm.ID)
 			rmm.OnlineMemberList[member.userID] = member.user
 		case memberID := <-rmm.unregister:
-			if _, ok := rmm.OnlineMemberList[memberID]; ok {
+			if item, ok := rmm.OnlineMemberList[memberID]; ok {
 				log.Println(memberID, " in room ", rmm.ID, " is unregister")
-				rmm.NobodyTicker = time.NewTicker(NOONE_TIME * time.Second)
-				rmm.OnlineMemberList[memberID].Conn.Close()
-				close(rmm.OnlineMemberList[memberID].broadTextMsg)
 				delete(rmm.OnlineMemberList, memberID)
+				rmm.NobodyTicker = time.NewTicker(NOONE_TIME * time.Second)
+				item.Conn.Close()
+				close(item.broadTextMsg)
 			}
 		case <-rmm.SaveMsgTicker.C:
 			rmm.SaveMsg2DBByTicker(db)
