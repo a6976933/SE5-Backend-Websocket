@@ -133,11 +133,6 @@ func (wsh *WsHandler) Unregister() {
 }
 
 func (wsh *WsHandler) ReadPump() {
-	defer func() {
-		wsh.Conn.Close()
-		wsh.Room.unregister <- wsh.UserID
-	}()
-
 	for {
 		var textMessage TextMsg
 		var recvMessage RecvMsg
@@ -160,6 +155,7 @@ func (wsh *WsHandler) ReadPump() {
 		if !isValid || JWTID != recvMessage.UserID {
 			wsh.Conn.Close()
 			log.Println("Token Invalid!!!", JWTID, recvMessage.UserID)
+			wsh.Unregister()
 			return
 		}
 		if recvMessage.Header == "message" {
