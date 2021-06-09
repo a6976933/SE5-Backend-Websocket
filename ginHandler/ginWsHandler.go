@@ -369,11 +369,18 @@ func RoomUpdateHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManag
 			return
 		}
 		modifiedRoom := rm.LiveRoomList[roomID]
-		c.JSON(http.StatusOK, gin.H{
-			"detail": "Successful update",
-		})
-		//log.Println(modifiedRoom.ID)
-		rm.LiveRoomList[modifiedRoom.ID].SendBroadcastUpdate(updateMessage.UpdateData, modifiedRoom.ID)
+		if updateMessage.UpdateData != "delete_room" {
+			c.JSON(http.StatusOK, gin.H{
+				"detail": "Successful update",
+			})
+			//log.Println(modifiedRoom.ID)
+			rm.LiveRoomList[modifiedRoom.ID].SendBroadcastUpdate(updateMessage.UpdateData, modifiedRoom.ID)
+		} else {
+			c.JSON(http.StatusOK, gin.H{
+				"detail": "Deleting Room",
+			})
+			rm.LiveRoomList[modifiedRoom.ID].SendCloseUpdate(updateMessage.UpdateData, modifiedRoom.ID)
+		}
 	}
 	return gin.HandlerFunc(fn)
 }

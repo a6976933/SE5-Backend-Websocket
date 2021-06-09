@@ -172,6 +172,11 @@ func (wsh *WsHandler) ReadPump() {
 				textMessage.recTime = time.Now()
 				wsh.Room.broadcast <- textMessage
 			}
+		} else if recvMessage.Header == "controlMessage" {
+			if recvMessage.Message == "Close" {
+				wsh.Unregister()
+				return
+			}
 		}
 
 	}

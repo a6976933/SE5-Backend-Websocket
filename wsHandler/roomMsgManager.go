@@ -10,11 +10,12 @@ import (
 )
 
 const (
-	HISTORY_MSG_NUM = 60
-	LOAD_NUM        = 50
-	MSG_SAVE_SIZE   = 70
-	SAVE_TIME       = 60
-	NOONE_TIME      = 20
+	HISTORY_MSG_NUM     = 60
+	LOAD_NUM            = 50
+	MSG_SAVE_SIZE       = 70
+	SAVE_TIME           = 60
+	NOONE_TIME          = 20
+	WAIT_CLOSEROOM_TIME = 20
 )
 
 type Msg interface {
@@ -244,7 +245,7 @@ func (rmm *RoomMsgManager) SaveMsg2DBByTicker(db *gorm.DB) {
 	if err != nil {
 		log.Println("Saving Room", rmm.ID, " Error when time trigger")
 	} else {
-		log.Println("Save Room ", rmm.ID, " Success when time trigger")
+		//log.Println("Save Room ", rmm.ID, " Success when time trigger")
 	}
 	rmm.SaveMsgTicker = time.NewTicker(SAVE_TIME * time.Second)
 }
@@ -271,6 +272,26 @@ func (rmm *RoomMsgManager) SendBroadcastUpdate(updateStr string, roomID int) {
 	msg.messageType = "update"
 	msg.roomID = roomID
 	rmm.broadcast <- msg
+}
+
+func (rmm *RoomMsgManager) SendCloseUpdate(updateStr string, roomID int) {
+	var msg TextMsg
+	msg.header = "update"
+	msg.word = updateStr
+	msg.recTime = time.Now()
+	msg.messageType = "update"
+	msg.roomID = roomID
+	rmm.broadcast <- msg
+	tick := time.NewTicker(WAIT_CLOSEROOM_TIME * time.Second)
+	select {
+	case <-tick.C:
+		if len(rmm.OnlineMemberList) != 0 {
+			for _, v := range rmm.OnlineMemberList {
+				v.Unregister()
+			}
+			rmm.Manager.CloseRoom(rmm.ID)
+		}
+	}
 }
 
 func (rmm *RoomMsgManager) Run(db *gorm.DB) {
@@ -307,6 +328,7 @@ func (rmm *RoomMsgManager) Run(db *gorm.DB) {
 			if _, ok := rmm.OnlineMemberList[memberID]; ok {
 				log.Println(memberID, " in room ", rmm.ID, " is unregister")
 				rmm.NobodyTicker = time.NewTicker(NOONE_TIME * time.Second)
+				rmm.OnlineMemberList[memberID].Conn.Close()
 				close(rmm.OnlineMemberList[memberID].broadTextMsg)
 				delete(rmm.OnlineMemberList, memberID)
 			}
