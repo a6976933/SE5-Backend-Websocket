@@ -227,6 +227,13 @@ func (wsh *WsHandler) SetWriteMsg(message Msg) WriteMsg {
 		wMsg.RoomID = message.GetRoomID()
 		wMsg.MsgTime = message.GetTime()
 		wMsg.Header = message.GetMsgHeader()
+	} else if message.GetMsgType() == "remove" {
+		wMsg.Message = message.GetTextMsg()
+		wMsg.MsgType = message.GetMsgType()
+		wMsg.RoomID = message.GetRoomID()
+		wMsg.MsgTime = message.GetTime()
+		wMsg.Header = message.GetMsgHeader()
+		wMsg.UserID = message.GetUserID()
 	}
 	return wMsg
 }
