@@ -290,6 +290,7 @@ func (rmm *RoomMsgManager) SendCloseUpdate(updateStr string, roomID int) {
 				v.Unregister()
 			}
 			rmm.Manager.CloseRoom(rmm.ID)
+			return
 		}
 	}
 }
@@ -302,6 +303,14 @@ func (rmm *RoomMsgManager) SendRemove(roomID int, userID int) {
 	msg.messageType = "remove"
 	msg.roomID = roomID
 	rmm.OnlineMemberList[userID].broadTextMsg <- msg
+	tick := time.NewTicker(WAIT_CLOSEROOM_TIME * time.Second)
+	select {
+	case <-tick.C:
+		if _, ok := rmm.OnlineMemberList[userID]; ok {
+			rmm.OnlineMemberList[userID].Unregister()
+			return
+		}
+	}
 }
 
 func (rmm *RoomMsgManager) Run(db *gorm.DB) {
