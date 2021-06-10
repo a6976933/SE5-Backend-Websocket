@@ -285,6 +285,7 @@ func RoomMemberRemoveHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.Roo
 			delete(modifiedRoom.UsernameMap, rmMessage.RemovedUserID)
 			delete(modifiedRoom.AccessLevelMap, rmMessage.RemovedUserID)
 		}
+		log.Println("Remove ", rmMessage.RemovedUserID, " from room ", roomID)
 		c.JSON(http.StatusOK, gin.H{
 			"detail": "Successful remove user from room",
 		})
