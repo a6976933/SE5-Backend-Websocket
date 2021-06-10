@@ -278,7 +278,7 @@ func RoomMemberRemoveHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.Roo
 		modifiedRoom := rm.LiveRoomList[roomID]
 		if modifiedRoom.IsMemberInRoom(rmMessage.RemovedUserID) {
 			if modifiedRoom.IsMemeberOnline(rmMessage.RemovedUserID) {
-				modifiedRoom.OnlineMemberList[rmMessage.RemovedUserID].Unregister()
+				modifiedRoom.SendRemove(roomID, rmMessage.RemovedUserID)
 			} else {
 				log.Println("User ", rmMessage.RemovedUserID, "isn't online")
 			}

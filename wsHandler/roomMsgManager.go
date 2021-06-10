@@ -294,6 +294,16 @@ func (rmm *RoomMsgManager) SendCloseUpdate(updateStr string, roomID int) {
 	}
 }
 
+func (rmm *RoomMsgManager) SendRemove(roomID int, userID int) {
+	var msg TextMsg
+	msg.header = "remove"
+	msg.word = "Removed"
+	msg.recTime = time.Now()
+	msg.messageType = "remove"
+	msg.roomID = roomID
+	rmm.OnlineMemberList[userID].broadTextMsg <- msg
+}
+
 func (rmm *RoomMsgManager) Run(db *gorm.DB) {
 	for {
 		select {
