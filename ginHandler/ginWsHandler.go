@@ -275,14 +275,15 @@ func RoomMemberRemoveHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.Roo
 			})
 			return
 		}
-		cnt := int64(0)
-		db.Model(&wsHandler.RoomRoommember{}).Where("room_id = ? AND member_id = ?", roomID, rmMessage.RemovedUserID).Count(&cnt)
-		if cnt == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"detail": "User not in the room",
-			})
-			return
-		}
+		/*
+			cnt := int64(0)
+			db.Model(&wsHandler.RoomRoommember{}).Where("room_id = ? AND member_id = ?", roomID, rmMessage.RemovedUserID).Count(&cnt)
+			if cnt == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"detail": "User not in the room",
+				})
+				return
+			}*/
 		modifiedRoom := rm.LiveRoomList[roomID]
 		if modifiedRoom.IsMemberInRoom(rmMessage.RemovedUserID) {
 			if modifiedRoom.IsMemeberOnline(rmMessage.RemovedUserID) {
