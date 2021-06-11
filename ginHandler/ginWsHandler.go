@@ -393,6 +393,14 @@ func RoomUpdateHandler(oum *wsHandler.OnlineUserManager, rm *wsHandler.RoomManag
 			c.JSON(http.StatusOK, gin.H{
 				"detail": "Deleting Room",
 			})
+			cnt := int64(0)
+			db.Model(&wsHandler.RoomRoom{}).Where("id = ?", roomID).Count(&cnt)
+			if cnt > 0 {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"detail": "We can find the room, Are you intruder?",
+				})
+				return
+			}
 			rm.LiveRoomList[modifiedRoom.ID].SendCloseUpdate(updateMessage.UpdateData, modifiedRoom.ID)
 		}
 	}
