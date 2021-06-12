@@ -15,7 +15,7 @@ const (
 	MSG_SAVE_SIZE       = 70
 	SAVE_TIME           = 60
 	NOONE_TIME          = 20
-	WAIT_CLOSEROOM_TIME = 10
+	WAIT_CLOSEROOM_TIME = 120
 )
 
 type Msg interface {
