@@ -105,13 +105,13 @@ func RoomConnectHandler(rm *wsHandler.RoomManager, db *gorm.DB) gin.HandlerFunc 
 					log.Println("So Close the Connection!!!")
 					wsH.Conn.Close()
 					return
-				} else {
+				} /*else {
 					err = servingRoom.LoadInitInfo(db)
 					if err != nil {
 						log.Println(err)
 						return
 					}
-				}
+				}*/
 			}
 		} else {
 			/*
